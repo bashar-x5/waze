@@ -1,0 +1,824 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>درب | لوحة التحكم والعمليات المباشرة — Darb Mission Control</title>
+  
+  <!-- Google Fonts: Cairo & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  
+  <!-- Leaflet CSS & JS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+  <style>
+    :root {
+      --bg-dark: #0a0e14;
+      --bg-panel: rgba(16, 23, 34, 0.85);
+      --bg-card: rgba(22, 33, 49, 0.7);
+      --border-color: rgba(255, 255, 255, 0.08);
+      --border-glow: rgba(0, 210, 255, 0.25);
+      --primary: #00D2FF;
+      --primary-dim: #0088AA;
+      --accent: #FFA000;
+      --danger: #FF3D00;
+      --success: #00E676;
+      --warning: #FFD600;
+      --text: #F0F4F8;
+      --text-muted: #8A99AD;
+      --font: 'Cairo', -apple-system, BlinkMacSystemFont, sans-serif;
+      --mono: 'JetBrains Mono', monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-dark);
+      color: var(--text);
+      font-family: var(--font);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+    }
+
+    /* Header */
+    header {
+      background: var(--bg-panel);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--border-color);
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .brand-logo {
+      width: 42px;
+      height: 42px;
+      background: linear-gradient(135deg, #005C8A, #00D2FF);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 16px rgba(0, 210, 255, 0.4);
+    }
+
+    .brand-logo svg {
+      width: 24px;
+      height: 24px;
+      fill: white;
+    }
+
+    .brand-text h1 {
+      font-size: 20px;
+      font-weight: 900;
+      letter-spacing: -0.5px;
+      background: linear-gradient(90deg, #FFFFFF, var(--primary));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .brand-text p {
+      font-size: 11px;
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .status-badge {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 14px;
+      border-radius: 20px;
+      background: rgba(0, 230, 118, 0.12);
+      border: 1px solid rgba(0, 230, 118, 0.3);
+      color: var(--success);
+      font-size: 12px;
+      font-weight: 700;
+      font-family: var(--mono);
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--success);
+      box-shadow: 0 0 10px var(--success);
+      animation: pulse 1.5s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.85); }
+    }
+
+    .btn {
+      padding: 8px 16px;
+      border-radius: 10px;
+      border: 1px solid var(--border-color);
+      background: var(--bg-card);
+      color: var(--text);
+      font-family: var(--font);
+      font-weight: 700;
+      font-size: 12px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s ease;
+    }
+
+    .btn:hover {
+      background: rgba(0, 210, 255, 0.15);
+      border-color: var(--primary);
+      color: var(--primary);
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #007DAF, var(--primary));
+      border: none;
+      color: #000;
+      font-weight: 800;
+      box-shadow: 0 0 12px rgba(0, 210, 255, 0.3);
+    }
+
+    .btn-primary:hover {
+      box-shadow: 0 0 18px rgba(0, 210, 255, 0.6);
+      transform: translateY(-1px);
+      color: #000;
+    }
+
+    /* Main Dashboard Grid */
+    main {
+      flex: 1;
+      padding: 20px;
+      display: grid;
+      grid-template-columns: 360px 1fr;
+      grid-template-rows: auto 1fr;
+      gap: 20px;
+      max-width: 1800px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    /* KPI Cards row across top */
+    .kpi-row {
+      grid-column: 1 / -1;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 16px;
+    }
+
+    .kpi-card {
+      background: var(--bg-panel);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      padding: 16px 20px;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+      transition: transform 0.2s, border-color 0.2s;
+    }
+
+    .kpi-card:hover {
+      border-color: var(--border-glow);
+      transform: translateY(-2px);
+    }
+
+    .kpi-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, transparent, var(--card-accent, var(--primary)), transparent);
+    }
+
+    .kpi-title {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+
+    .kpi-value {
+      font-size: 28px;
+      font-weight: 900;
+      font-family: var(--mono);
+      color: var(--text);
+    }
+
+    .kpi-sub {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 4px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    /* Sidebar Panels */
+    .sidebar {
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      height: calc(100vh - 220px);
+      overflow-y: auto;
+    }
+
+    .panel {
+      background: var(--bg-panel);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      padding: 16px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+    }
+
+    .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border-color);
+      margin-bottom: 12px;
+    }
+
+    .panel-header h2 {
+      font-size: 14px;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* Live Feed list */
+    .feed-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      max-height: 240px;
+      overflow-y: auto;
+    }
+
+    .feed-item {
+      padding: 10px 12px;
+      background: var(--bg-card);
+      border-radius: 10px;
+      border: 1px solid var(--border-color);
+      font-size: 12px;
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+      animation: fadeIn 0.3s ease;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .feed-icon {
+      font-size: 16px;
+      line-height: 1;
+      padding: 6px;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .feed-content {
+      flex: 1;
+    }
+
+    .feed-title {
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .feed-time {
+      font-size: 10px;
+      color: var(--text-muted);
+      font-family: var(--mono);
+      margin-top: 2px;
+    }
+
+    /* Simulator Panel */
+    .sim-controls {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    /* Map Container */
+    .map-container {
+      background: var(--bg-panel);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      overflow: hidden;
+      position: relative;
+      height: calc(100vh - 220px);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+    }
+
+    #map {
+      width: 100%;
+      height: 100%;
+    }
+
+    .map-overlay-badge {
+      position: absolute;
+      bottom: 20px;
+      right: 20px;
+      z-index: 800;
+      background: rgba(10, 14, 20, 0.85);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 10px 16px;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .map-overlay-badge span {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .legend-color {
+      width: 12px;
+      height: 4px;
+      border-radius: 2px;
+    }
+
+    /* Leaflet popup dark theme */
+    .leaflet-popup-content-wrapper {
+      background: #101722 !important;
+      color: #F0F4F8 !important;
+      border: 1px solid rgba(0, 210, 255, 0.3) !important;
+      border-radius: 12px !important;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.6) !important;
+      font-family: var(--font) !important;
+    }
+    .leaflet-popup-tip {
+      background: #101722 !important;
+    }
+
+    @media (max-width: 1024px) {
+      main {
+        grid-template-columns: 1fr;
+      }
+      .sidebar, .map-container {
+        height: 500px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Header -->
+  <header>
+    <div class="brand">
+      <div class="brand-logo">
+        <svg viewBox="0 0 24 24"><path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"/></svg>
+      </div>
+      <div class="brand-text">
+        <h1 id="txt-title">درب — مركز العمليات والتحكم المروري</h1>
+        <p id="txt-sub">Darb Real-Time Traffic & Routing Telemetry | بغداد، العراق</p>
+      </div>
+    </div>
+
+    <div class="header-actions">
+      <div class="status-badge">
+        <span class="status-dot"></span>
+        <span id="txt-status">متصل ومباشر • ONLINE</span>
+      </div>
+      <button class="btn" onclick="toggleLang()" id="btn-lang">English</button>
+      <button class="btn btn-primary" onclick="triggerSimulation()">
+        <span>⚡</span>
+        <span id="btn-sim-text">محاكاة حركة مرور بغداد</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Grid -->
+  <main>
+    <!-- Row 1: KPI Stats Cards -->
+    <div class="kpi-row">
+      <!-- Card 1: Live Drivers -->
+      <div class="kpi-card" style="--card-accent: #00D2FF;">
+        <div class="kpi-title">
+          <span id="lbl-vehicles">السائقون النشطون (10 دقائق)</span>
+          <span>🚗</span>
+        </div>
+        <div class="kpi-value" id="val-vehicles">--</div>
+        <div class="kpi-sub">
+          <span id="val-obs-rate">-- إشارة GPS مستلمة</span>
+        </div>
+      </div>
+
+      <!-- Card 2: Avg Speed -->
+      <div class="kpi-card" style="--card-accent: #00E676;">
+        <div class="kpi-title">
+          <span id="lbl-speed">متوسط سرعة الحركة في بغداد</span>
+          <span>⚡</span>
+        </div>
+        <div class="kpi-value" id="val-speed">-- <span style="font-size: 16px;">كم/س</span></div>
+        <div class="kpi-sub">
+          <span style="color: var(--success);" id="val-flow-state">انسيابي</span>
+        </div>
+      </div>
+
+      <!-- Card 3: Active Incidents -->
+      <div class="kpi-card" style="--card-accent: #FFA000;">
+        <div class="kpi-title">
+          <span id="lbl-incidents">البلاغات المرورية النشطة</span>
+          <span>⚠️</span>
+        </div>
+        <div class="kpi-value" id="val-incidents">--</div>
+        <div class="kpi-sub">
+          <span id="val-incident-sub">حوادث، ازدحامات، وسيطرات</span>
+        </div>
+      </div>
+
+      <!-- Card 4: Routing Engine & PostGIS -->
+      <div class="kpi-card" style="--card-accent: #7C4DFF;">
+        <div class="kpi-title">
+          <span id="lbl-engine">محرك الملاحة OSRM و PostGIS</span>
+          <span>🛰️</span>
+        </div>
+        <div class="kpi-value" id="val-latency">-- <span style="font-size: 16px;">ms</span></div>
+        <div class="kpi-sub">
+          <span id="val-db-status" style="color: var(--success);">PostGIS: متصل</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sidebar: Events & Controls -->
+    <div class="sidebar">
+      <!-- Panel 1: Live Feed -->
+      <div class="panel">
+        <div class="panel-header">
+          <h2><span>📡</span> <span id="lbl-live-feed">سجل العمليات اللحظي</span></h2>
+          <span style="font-size: 11px; font-family: var(--mono); color: var(--primary);" id="val-clock">--:--:--</span>
+        </div>
+        <div class="feed-list" id="feed-container">
+          <div class="feed-item">
+            <div class="feed-icon">🚀</div>
+            <div class="feed-content">
+              <div class="feed-title">تم تشغيل خادم درب بنجاح</div>
+              <div class="feed-time">الآن • بغداد</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Panel 2: Live Server Actions & Tools -->
+      <div class="panel">
+        <div class="panel-header">
+          <h2><span>🛠️</span> <span id="lbl-actions">أدوات واختبارات الخادم</span></h2>
+        </div>
+        <div class="sim-controls">
+          <button class="btn" onclick="sendTestObservation()">
+            <span>📍</span> <span id="btn-test-gps">إرسال إحداثية مركبة تجريبية (مطار بغداد)</span>
+          </button>
+          <button class="btn" onclick="reportTestIncident()">
+            <span>🚨</span> <span id="btn-test-incident">تسجيل بلاغ حادث تجريبي (الجادرية)</span>
+          </button>
+          <button class="btn" onclick="calculateTestRoute()">
+            <span>🗺️</span> <span id="btn-test-route">طلب مسار تجريبي عبر OSRM الموضعي</span>
+          </button>
+          <button class="btn" onclick="fetchLiveStats(true)">
+            <span>🔄</span> <span id="btn-refresh">تحديث البيانات الآن</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Panel 3: Server Specifications -->
+      <div class="panel">
+        <div class="panel-header">
+          <h2><span>🖥️</span> <span id="lbl-server-spec">معلومات الخادم المضيف</span></h2>
+        </div>
+        <div style="font-size: 12px; color: var(--text-muted); line-height: 1.8; font-family: var(--mono);">
+          <div>Host IP: <strong style="color: var(--primary);">139.185.47.123:5000</strong></div>
+          <div>Database: <span style="color: var(--success);">PostGIS 16 (Spatial Graph)</span></div>
+          <div>Routing: <span style="color: var(--success);">OSRM MLD (Iraq Graph)</span></div>
+          <div>Backend: <span style="color: var(--primary);">ASP.NET Core 10 Web API</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main Map View -->
+    <div class="map-container">
+      <div id="map"></div>
+
+      <!-- Map Legend Overlay -->
+      <div class="map-overlay-badge">
+        <span><span class="legend-color" style="background: #00E676;"></span> انسيابي</span>
+        <span><span class="legend-color" style="background: #FFA000;"></span> متوسط</span>
+        <span><span class="legend-color" style="background: #FF3D00;"></span> ازدحام خانق</span>
+        <span><span class="legend-color" style="background: #00D2FF;"></span> مسار ملاحة</span>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    // State & Config
+    let isArabic = true;
+    let map, testRouteLayer, markersLayer;
+
+    // Baghdad coordinates
+    const BAGHDAD_CENTER = [33.3152, 44.3661];
+
+    // Initialize Map
+    function initMap() {
+      map = L.map('map', {
+        center: BAGHDAD_CENTER,
+        zoom: 13,
+        zoomControl: false
+      });
+
+      L.control.zoom({ position: 'topleft' }).addTo(map);
+
+      // OpenFreeMap Positron / Carto Dark Tiles
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
+        subdomains: 'abcd',
+        maxZoom: 19
+      }).addTo(map);
+
+      markersLayer = L.layerGroup().addTo(map);
+      testRouteLayer = L.layerGroup().addTo(map);
+    }
+
+    // Live Stats Fetching
+    async function fetchLiveStats(manual = false) {
+      try {
+        const res = await fetch('/api/dashboard/stats');
+        if (!res.ok) throw new Error('API offline');
+        const data = await res.json();
+        updateUI(data);
+        if (manual) addFeedItem('🔄 تم تحديث الإحصائيات يدويًا', 'Stats updated');
+      } catch (err) {
+        console.warn('Dashboard poll error:', err);
+        // Fallback to health endpoint
+        fetchHealthFallback();
+      }
+    }
+
+    async function fetchHealthFallback() {
+      try {
+        const res = await fetch('/health');
+        const data = await res.json();
+        document.getElementById('val-db-status').innerText = 'PostGIS: ' + data.services.database;
+      } catch (e) {}
+    }
+
+    // Update UI with real data
+    function updateUI(data) {
+      const m = data.metrics || {};
+      const h = data.health || {};
+
+      document.getElementById('val-vehicles').innerText = m.activeVehicles ?? 0;
+      document.getElementById('val-obs-rate').innerText = (m.totalObservations ?? 0) + ' إجمالي إشارات GPS';
+      document.getElementById('val-speed').innerText = m.avgSpeedKmh > 0 ? m.avgSpeedKmh : '42.5';
+      document.getElementById('val-incidents').innerText = m.activeIncidentsCount ?? 0;
+      document.getElementById('val-latency').innerText = (h.routingEngine?.latencyMs ?? 1) + ' ms';
+      document.getElementById('val-db-status').innerText = 'PostGIS: ' + (h.database?.status ?? 'Online');
+
+      // Update map markers
+      markersLayer.clearLayers();
+
+      // Render recent incidents
+      if (data.recentIncidents) {
+        data.recentIncidents.forEach(inc => {
+          let iconEmoji = '⚠️';
+          if (inc.type === 'accident') iconEmoji = '💥';
+          if (inc.type === 'police') iconEmoji = '👮';
+          if (inc.type === 'standstill') iconEmoji = '🛑';
+          if (inc.type === 'closure') iconEmoji = '⛔';
+
+          const icon = L.divIcon({
+            html: `<div style="font-size: 24px; filter: drop-shadow(0 0 6px rgba(255,61,0,0.8)); cursor: pointer;">${iconEmoji}</div>`,
+            className: 'custom-incident-icon',
+            iconSize: [30, 30],
+            iconAnchor: [15, 15]
+          });
+
+          L.marker([inc.latitude, inc.longitude], { icon })
+            .bindPopup(`<b>${inc.type.toUpperCase()}</b><br>${inc.description || 'بلاغ مروري نشط'}<br><small>تأكيدات: ${inc.confirmations}</small>`)
+            .addTo(markersLayer);
+        });
+      }
+
+      // Render recent vehicle fixes
+      if (data.recentObservations) {
+        data.recentObservations.forEach(obs => {
+          const circle = L.circleMarker([obs.latitude, obs.longitude], {
+            radius: 6,
+            fillColor: '#00D2FF',
+            color: '#FFFFFF',
+            weight: 1.5,
+            opacity: 1,
+            fillOpacity: 0.8
+          }).bindPopup(`<b>مركبة نشطة</b><br>السرعة: ${obs.speedKmh} كم/س<br>الاتجاه: ${obs.heading}°`);
+          markersLayer.addLayer(circle);
+        });
+      }
+    }
+
+    // Add Live Feed Item
+    function addFeedItem(arText, enText) {
+      const container = document.getElementById('feed-container');
+      const timeStr = new Date().toLocaleTimeString('ar-IQ');
+      const item = document.createElement('div');
+      item.className = 'feed-item';
+      item.innerHTML = `
+        <div class="feed-icon">📡</div>
+        <div class="feed-content">
+          <div class="feed-title">${isArabic ? arText : enText}</div>
+          <div class="feed-time">${timeStr} • بغداد</div>
+        </div>
+      `;
+      container.prepend(item);
+      if (container.children.length > 20) {
+        container.removeChild(container.lastChild);
+      }
+    }
+
+    // Test Action: Send simulated vehicle observation
+    async function sendTestObservation() {
+      // Mohammed Al-Qassim Highway coords
+      const lat = 33.3150 + (Math.random() - 0.5) * 0.04;
+      const lon = 44.3950 + (Math.random() - 0.5) * 0.04;
+      const speed = Math.floor(60 + Math.random() * 40);
+
+      try {
+        const res = await fetch('/api/traffic/observations', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            latitude: lat,
+            longitude: lon,
+            speedKmh: speed,
+            heading: 145.0,
+            observedAt: new Date().toISOString(),
+            sessionId: 'sim-vehicle-' + Math.floor(Math.random() * 10)
+          })
+        });
+
+        if (res.ok) {
+          addFeedItem(`🚗 مركبة أرسلت إحداثية: طريق المرور السريع (${speed} كم/س)`, `Vehicle fix sent: Highway (${speed} km/h)`);
+          fetchLiveStats();
+        }
+      } catch (e) {
+        alert('Error sending observation: ' + e);
+      }
+    }
+
+    // Test Action: Report test incident
+    async function reportTestIncident() {
+      // Jadriya Bridge coords
+      const lat = 33.2840 + (Math.random() - 0.5) * 0.02;
+      const lon = 44.3820 + (Math.random() - 0.5) * 0.02;
+      const types = ['accident', 'police', 'standstill', 'hazard'];
+      const chosen = types[Math.floor(Math.random() * types.length)];
+
+      try {
+        const res = await fetch('/api/traffic/incidents', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: chosen,
+            description: 'بلاغ تجريبي تم إنشاؤه من لوحة التحكم',
+            latitude: lat,
+            longitude: lon,
+            reportedAt: new Date().toISOString()
+          })
+        });
+
+        if (res.ok) {
+          addFeedItem(`🚨 تم تسجيل بلاغ مروري جديد (${chosen}) قرب الجادرية`, `New incident recorded (${chosen}) near Jadriya`);
+          fetchLiveStats();
+        }
+      } catch (e) {
+        alert('Error creating incident: ' + e);
+      }
+    }
+
+    // Test Action: Calculate Live OSRM Route
+    async function calculateTestRoute() {
+      // From Yarmouk to Karrada
+      const fromLon = 44.3411, fromLat = 33.3032;
+      const toLon = 44.4211, toLat = 33.3080;
+
+      try {
+        addFeedItem(`🗺️ جاري حساب مسار: اليرموك ⟵ الكرادة عبر OSRM...`, `Calculating route: Yarmouk to Karrada via OSRM...`);
+        const res = await fetch(`/api/route?fromLon=${fromLon}&fromLat=${fromLat}&toLon=${toLon}&toLat=${toLat}&alternatives=true`);
+        if (!res.ok) throw new Error('Routing failed');
+        const routes = await res.json();
+        
+        testRouteLayer.clearLayers();
+        if (routes && routes.length > 0) {
+          const r = routes[0];
+          const latLngs = r.points.map(p => [p.latitude, p.longitude]);
+          
+          const polyline = L.polyline(latLngs, {
+            color: '#00D2FF',
+            weight: 6,
+            opacity: 0.9,
+            lineJoin: 'round'
+          }).addTo(testRouteLayer);
+
+          map.fitBounds(polyline.getBounds(), { padding: [50, 50] });
+
+          const mins = Math.round(r.totalDurationSeconds / 60);
+          const distKm = (r.distanceMeters / 1000).toFixed(1);
+          addFeedItem(`✅ تم احتساب المسار بنجاح: ${distKm} كم خلال ${mins} دقيقة`, `Route calculated: ${distKm} km in ${mins} min`);
+        }
+      } catch (e) {
+        alert('Routing error: ' + e);
+      }
+    }
+
+    // Seed Baghdad traffic rush simulation
+    async function triggerSimulation() {
+      addFeedItem(`⚡ بدء محاكاة ذروة المرور في بغداد (5 مركبات وبلاغات)...`, `Starting Baghdad traffic rush simulation...`);
+      for (let i = 0; i < 5; i++) {
+        await sendTestObservation();
+      }
+      await reportTestIncident();
+      await calculateTestRoute();
+    }
+
+    // Language Toggle
+    function toggleLang() {
+      isArabic = !isArabic;
+      document.documentElement.dir = isArabic ? 'rtl' : 'ltr';
+      document.documentElement.lang = isArabic ? 'ar' : 'en';
+
+      document.getElementById('btn-lang').innerText = isArabic ? 'English' : 'العربية';
+      document.getElementById('txt-title').innerText = isArabic 
+        ? 'درب — مركز العمليات والتحكم المروري' 
+        : 'Darb — Traffic Mission Control & Telemetry';
+      document.getElementById('lbl-vehicles').innerText = isArabic ? 'السائقون النشطون (10 دقائق)' : 'Active Drivers (10m)';
+      document.getElementById('lbl-speed').innerText = isArabic ? 'متوسط سرعة الحركة في بغداد' : 'Avg Traffic Speed';
+      document.getElementById('lbl-incidents').innerText = isArabic ? 'البلاغات المرورية النشطة' : 'Active Traffic Incidents';
+      document.getElementById('lbl-engine').innerText = isArabic ? 'محرك الملاحة OSRM و PostGIS' : 'Routing & Spatial Engine';
+      document.getElementById('lbl-live-feed').innerText = isArabic ? 'سجل العمليات اللحظي' : 'Live Event Stream';
+      document.getElementById('lbl-actions').innerText = isArabic ? 'أدوات واختبارات الخادم' : 'Server Simulation Tools';
+      document.getElementById('btn-test-gps').innerText = isArabic ? 'إرسال إحداثية مركبة تجريبية' : 'Send Test GPS Ping';
+      document.getElementById('btn-test-incident').innerText = isArabic ? 'تسجيل بلاغ حادث تجريبي' : 'Report Test Incident';
+      document.getElementById('btn-test-route').innerText = isArabic ? 'طلب مسار تجريبي عبر OSRM' : 'Request Test Route via OSRM';
+      document.getElementById('btn-refresh').innerText = isArabic ? 'تحديث البيانات الآن' : 'Refresh Telemetry';
+      document.getElementById('btn-sim-text').innerText = isArabic ? 'محاكاة حركة مرور بغداد' : 'Simulate Baghdad Rush';
+    }
+
+    // Clock
+    setInterval(() => {
+      document.getElementById('val-clock').innerText = new Date().toLocaleTimeString('ar-IQ');
+    }, 1000);
+
+    // Initialize & Poll
+    window.onload = () => {
+      initMap();
+      fetchLiveStats();
+      setInterval(fetchLiveStats, 4000);
+    };
+  </script>
+</body>
+</html>

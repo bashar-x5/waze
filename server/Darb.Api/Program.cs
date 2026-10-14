@@ -46,6 +46,8 @@ builder.Services.AddOpenApi();
 var app = builder.Build();
 
 app.UseCors("AllowAll");
+app.UseDefaultFiles();
+app.UseStaticFiles();
 
 if (app.Environment.IsDevelopment())
 {
@@ -241,5 +243,121 @@ app.MapGet("/api/traffic/incidents", async (
     return Results.Ok(incidents);
 })
 .WithName("GetTrafficIncidents");
+
+// -------------------------------------------------------------
+// DASHBOARD & TELEMETRY ENDPOINTS
+// -------------------------------------------------------------
+
+app.MapGet("/dashboard", () => Results.Redirect("/index.html"))
+   .WithName("DashboardRedirect");
+
+app.MapGet("/api/dashboard/stats", async (
+    DarbDbContext db,
+    IHttpClientFactory httpClientFactory,
+    CancellationToken ct) =>
+{
+    var now = DateTime.UtcNow;
+    var tenMinsAgo = now.AddMinutes(-10);
+
+    // Measure PostGIS latency
+    var dbWatch = System.Diagnostics.Stopwatch.StartNew();
+    var dbOk = false;
+    try { dbOk = await db.Database.CanConnectAsync(ct); } catch {}
+    dbWatch.Stop();
+
+    // Measure OSRM routing latency
+    var osrmWatch = System.Diagnostics.Stopwatch.StartNew();
+    var osrmOk = false;
+    try
+    {
+        var osrmClient = httpClientFactory.CreateClient(nameof(IOsrmRoutingService));
+        var res = await osrmClient.GetAsync("/route/v1/driving/44.3661,33.3152;44.4009,33.3406?overview=false", ct);
+        osrmOk = res.IsSuccessStatusCode;
+    } catch {}
+    osrmWatch.Stop();
+
+    // Observations metrics
+    var totalObservations = await db.GpsObservations.CountAsync(ct);
+    var recentObservations = await db.GpsObservations
+        .Where(o => o.ReceivedAt >= tenMinsAgo)
+        .OrderByDescending(o => o.ReceivedAt)
+        .Take(50)
+        .ToListAsync(ct);
+
+    var activeVehicles = recentObservations
+        .Select(o => o.SessionId)
+        .Where(s => !string.IsNullOrEmpty(s))
+        .Distinct()
+        .Count();
+
+    var avgSpeed = recentObservations.Count > 0
+        ? Math.Round(recentObservations.Average(o => o.SpeedKmh), 1)
+        : 0.0;
+
+    // Active incidents
+    var activeIncidents = await db.TrafficIncidents
+        .Where(i => i.ExpiresAt > now)
+        .OrderByDescending(i => i.CreatedAt)
+        .Take(50)
+        .Select(i => new {
+            i.Id,
+            i.Type,
+            i.Description,
+            i.Latitude,
+            i.Longitude,
+            ReportedAt = i.CreatedAt,
+            i.Confirmations,
+            ExpiresInMin = Math.Max(0, (int)(i.ExpiresAt - now).TotalMinutes)
+        })
+        .ToListAsync(ct);
+
+    // Congestion segments
+    var congestionSegments = await db.RoadTrafficAggregates
+        .Where(a => a.UpdatedAt >= now.AddMinutes(-30))
+        .OrderByDescending(a => a.UpdatedAt)
+        .Take(100)
+        .Select(a => new {
+            a.SegmentKey,
+            a.RoadName,
+            a.Latitude,
+            a.Longitude,
+            a.AverageSpeedKmh,
+            a.CongestionLevel,
+            SamplesCount = a.SampleCount,
+            a.UpdatedAt
+        })
+        .ToListAsync(ct);
+
+    return Results.Ok(new
+    {
+        status = dbOk && osrmOk ? "Operational" : "Degraded",
+        serverTime = now,
+        targetCity = "Baghdad, Iraq",
+        metrics = new
+        {
+            totalObservations,
+            activeObservations10m = recentObservations.Count,
+            activeVehicles,
+            avgSpeedKmh = avgSpeed,
+            activeIncidentsCount = activeIncidents.Count,
+            congestedSegmentsCount = congestionSegments.Count(s => s.CongestionLevel != "Free")
+        },
+        health = new
+        {
+            database = new { status = dbOk ? "Online" : "Offline", latencyMs = dbWatch.ElapsedMilliseconds },
+            routingEngine = new { status = osrmOk ? "Online" : "Offline", latencyMs = osrmWatch.ElapsedMilliseconds }
+        },
+        recentIncidents = activeIncidents,
+        congestionSegments,
+        recentObservations = recentObservations.Take(30).Select(o => new {
+            o.Latitude,
+            o.Longitude,
+            o.SpeedKmh,
+            o.Heading,
+            o.ObservedAt
+        })
+    });
+})
+.WithName("GetDashboardStats");
 
 app.Run();
