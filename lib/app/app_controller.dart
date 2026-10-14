@@ -221,7 +221,7 @@ class AppController extends ChangeNotifier {
   }
 
   Future<void> removeStop() async { stop = null; await refreshRoutes(); }
-  Future<void> refreshRoutes({bool rerouting = false}) async {
+  Future<void> refreshRoutes({bool rerouting = false, double? bearing}) async {
     if (destination == null) return;
     final ticket = ++_routeRequest;
     final target = destination!;
@@ -231,20 +231,37 @@ class AppController extends ChangeNotifier {
     try {
       List<DriveRoute>? apiRoutes;
       if (!demoMode && stop == null) {
-        apiRoutes = await _api.fetchRoutes(position, target.point, alternatives: true);
+        apiRoutes = await _api.fetchRoutes(
+          position,
+          target.point,
+          alternatives: true,
+          bearing: bearing,
+        );
       }
       final found = demoMode
           ? demoRoutes(target, stop: stop)
           : (apiRoutes != null && apiRoutes.isNotEmpty)
               ? apiRoutes
-              : await _routing.routes(position, target, stop: stop);
+              : await _routing.routes(
+                  position,
+                  target,
+                  stop: stop,
+                  bearing: bearing,
+                );
       if (ticket != _routeRequest || _disposed) return;
       routes = calculateTrafficAndRankRoutes(found, reports);
       routeIndex = 0;
       progress = null;
       _spokenStep = -1;
       if (rerouting) {
-        notice = tr('Route updated.', 'تم تحديث المسار.');
+        if (routes.length > 1) {
+          notice = tr(
+            'Route updated. Alternative route available.',
+            'تم تحديث المسار. يتوفر مسار بديل.',
+          );
+        } else {
+          notice = tr('Route updated.', 'تم تحديث المسار.');
+        }
       } else if (routes.isNotEmpty && routes.first.hasTraffic) {
         final totalMin = (routes.first.totalDurationSeconds / 60).ceil();
         final delayMin = (routes.first.trafficDelaySeconds / 60).round();
@@ -268,8 +285,21 @@ class AppController extends ChangeNotifier {
   }
 
   void selectRoute(int index) {
-    if (index < 0 || index >= routes.length || navigating) return;
-    routeIndex = index; progress = null; _emit();
+    if (index < 0 || index >= routes.length) return;
+    routeIndex = index;
+    if (navigating && route != null) {
+      progress = calculateProgress(
+        route!,
+        position,
+        heading: heading.isFinite && heading >= 0 ? heading : null,
+      );
+      _spokenStep = -1;
+      _speak(tr('Switched to alternative route.', 'تم التبديل إلى المسار البديل.'));
+      notice = tr('Switched to alternative route.', 'تم التبديل إلى المسار البديل.');
+    } else {
+      progress = null;
+    }
+    _emit();
   }
   void clearRoute() {
     stopNavigation(); _routeRequest++; busy = false; destination = null; stop = null;
@@ -398,12 +428,27 @@ class AppController extends ChangeNotifier {
   void _advance() {
     final current = route;
     if (current == null) return;
-    progress = calculateProgress(current, position, previousMeters: progress?.traveledMeters ?? 0);
+    progress = calculateProgress(
+      current,
+      position,
+      previousMeters: progress?.traveledMeters ?? 0,
+      heading: heading.isFinite && heading >= 0 ? heading : null,
+    );
     final p = progress!;
-    // Street Map-Matching: snap vehicle display position onto the road
-    if (p.snappedPoint != null && p.distanceFromRouteMeters <= 35) {
+
+    // Heading Divergence check: if the car turned into a cross street while moving,
+    // do not snap the vehicle to the old road.
+    final isHeadingDivergent = heading.isFinite &&
+        heading >= 0 &&
+        speedKph >= 4 &&
+        p.headingDivergence != null &&
+        p.headingDivergence! > 50;
+
+    // Street Map-Matching: only snap vehicle if heading aligns with the road and distance is small
+    if (!isHeadingDivergent && p.snappedPoint != null && p.distanceFromRouteMeters <= 25) {
       position = p.snappedPoint!;
     }
+
     if (p.arrived) {
       _simulation?.cancel(); _simulation = null;
       navigating = false; arrived = true; speedKph = 0;
@@ -418,21 +463,29 @@ class AppController extends ChangeNotifier {
         final step = current.steps[p.stepIndex.clamp(0, current.steps.length - 1)];
         if (!lessChatty || !step.type.contains('continue')) _speak(step.label(arabic));
       }
-      // Instant auto-reroute when taking a wrong turn
-      if (p.distanceFromRouteMeters > 40) {
+
+      // Instant auto-reroute when taking a wrong turn:
+      // If heading is divergent (>50°) and vehicle moved 15m away, or if general distance > 30m
+      final isOffRoute = (isHeadingDivergent && p.distanceFromRouteMeters > 15) ||
+          p.distanceFromRouteMeters > 30;
+
+      if (isOffRoute) {
         _offRouteSamples++;
         final now = DateTime.now();
         final canReroute = !busy &&
-            (_lastReroute == null || now.difference(_lastReroute!).inSeconds >= 6);
-        if ((_offRouteSamples >= 2 || p.distanceFromRouteMeters > 65) && canReroute) {
+            (_lastReroute == null || now.difference(_lastReroute!).inSeconds >= 3);
+        if ((_offRouteSamples >= 1 || p.distanceFromRouteMeters > 45) && canReroute) {
           _lastReroute = now;
           _offRouteSamples = 0;
-          _speak(tr('Rerouting to destination...', 'إعادة توجيه المسار إلى الوجهة...'));
+          _speak(tr('Rerouting in your direction...', 'جارٍ إعادة التوجيه في اتجاهك...'));
           notice = tr(
-            'Off route. Auto-calculating new fastest route...',
-            'تم تغيير المسار. جارٍ إعادة حساب أسرع مسار جديد...',
+            'Wrong turn detected. Calculating route in your direction...',
+            'تم رصد تغيير المسار. جارٍ إعادة الحساب في اتجاه سيرك...',
           );
-          refreshRoutes(rerouting: true);
+          refreshRoutes(
+            rerouting: true,
+            bearing: heading.isFinite && heading >= 0 ? heading : null,
+          );
         }
       } else {
         _offRouteSamples = 0;

@@ -176,11 +176,15 @@ class DarbApiService {
     LatLng origin,
     LatLng destination, {
     bool alternatives = true,
+    double? bearing,
   }) async {
     if (_disposed) return null;
-    final uri = Uri.parse(
-      '$_baseUrl/api/route?fromLon=${origin.longitude}&fromLat=${origin.latitude}&toLon=${destination.longitude}&toLat=${destination.latitude}&alternatives=$alternatives',
-    );
+    var url =
+        '$_baseUrl/api/route?fromLon=${origin.longitude}&fromLat=${origin.latitude}&toLon=${destination.longitude}&toLat=${destination.latitude}&alternatives=$alternatives';
+    if (bearing != null && bearing.isFinite && bearing >= 0) {
+      url += '&bearing=${bearing.round()}';
+    }
+    final uri = Uri.parse(url);
 
     try {
       final response = await _client

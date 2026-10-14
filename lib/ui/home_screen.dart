@@ -609,10 +609,80 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               ),
           ],
 
-          // Faster Route Prompt Banner
-          if (c.routes.length > 1 && c.routeIndex != 0 && c.routes.first.totalDurationSeconds < c.route!.totalDurationSeconds - 60)
+          // Alternative Route Prompt Banner during navigation
+          if (c.navigating && c.routes.length > 1 && c.route != null) ...[
+            Builder(builder: (context) {
+              final otherIdx = c.routeIndex == 0 ? 1 : 0;
+              final otherRoute = c.routes[otherIdx];
+              final diffSec = (otherRoute.totalDurationSeconds - c.route!.totalDurationSeconds).round();
+              final diffMin = (diffSec / 60).round();
+
+              final String label;
+              if (diffMin < 0) {
+                label = arabic
+                    ? 'مسار أسرع يوفر ${diffMin.abs()} د'
+                    : 'Faster route saves ${diffMin.abs()} min';
+              } else if (diffMin == 0) {
+                label = arabic ? 'مسار بديل بنفس الوقت' : 'Alternative route (same ETA)';
+              } else {
+                label = arabic
+                    ? 'مسار بديل (+ $diffMin د)'
+                    : 'Alternative route (+ $diffMin min)';
+              }
+
+              return Positioned(
+                top: 210,
+                left: 16,
+                right: 76,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: diffMin < 0 ? const Color(0xFF0D47A1) : const Color(0xFF37474F),
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: const [
+                      BoxShadow(color: Colors.black38, blurRadius: 6, offset: Offset(0, 3)),
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        diffMin < 0 ? Icons.bolt_rounded : Icons.alt_route_rounded,
+                        color: diffMin < 0 ? Colors.amber : Colors.lightBlueAccent,
+                        size: 22,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          label,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.white,
+                          foregroundColor: diffMin < 0 ? WazeColors.blue : const Color(0xFF37474F),
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          minimumSize: const Size(0, 28),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        onPressed: () => c.selectRoute(otherIdx),
+                        child: Text(
+                          arabic ? 'تحويل' : 'Switch',
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }),
+          ] else if (!c.navigating && c.routes.length > 1 && c.routeIndex != 0 && c.routes.first.totalDurationSeconds < c.route!.totalDurationSeconds - 60) ...[
             Positioned(
-              top: c.navigating ? 210 : 110,
+              top: 110,
               left: 16,
               right: 76,
               child: Container(
@@ -658,6 +728,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 ),
               ),
             ),
+          ],
 
           // Notification / Error banners
           if (c.error != null || c.notice != null)

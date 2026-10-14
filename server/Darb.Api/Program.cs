@@ -127,6 +127,7 @@ app.MapGet("/api/route", async (
     [FromQuery] double toLon,
     [FromQuery] double toLat,
     [FromQuery] bool alternatives,
+    [FromQuery] double? bearing,
     IOsrmRoutingService routingService,
     CancellationToken cancellationToken) =>
 {
@@ -144,7 +145,7 @@ app.MapGet("/api/route", async (
 
     try
     {
-        var routes = await routingService.GetRoutesAsync(fromLon, fromLat, toLon, toLat, alternatives, cancellationToken);
+        var routes = await routingService.GetRoutesAsync(fromLon, fromLat, toLon, toLat, alternatives, bearing, cancellationToken);
         if (routes == null || routes.Count == 0)
         {
             return Results.NotFound(new { error = "No driving route could be found between the specified coordinates." });

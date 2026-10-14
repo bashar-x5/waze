@@ -68,6 +68,7 @@ class RoutingService {
     LatLng origin,
     Place destination, {
     Place? stop,
+    double? bearing,
   }) async {
     _checkActive();
     validateProviderPoint(origin);
@@ -79,34 +80,43 @@ class RoutingService {
             '${p.longitude.toStringAsFixed(6)},${p.latitude.toStringAsFixed(6)}')
         .join(';');
     final path = _base.path.replaceFirst(RegExp(r'/+$'), '');
-    final uri = _base.replace(
-      path: '$path/route/v1/driving/$coordinates',
-      queryParameters: {
+
+    String? bearingsParam;
+    if (bearing != null && bearing.isFinite && bearing >= 0) {
+      final b = (bearing.round() % 360 + 360) % 360;
+      bearingsParam = stop != null ? '$b,60;;' : '$b,60;';
+    }
+
+    Uri buildUri({bool includeBearings = true}) {
+      final params = <String, String>{
         'alternatives': '3',
         'steps': 'true',
         'geometries': 'geojson',
         'overview': 'full',
         'generate_hints': 'false',
-      },
-    );
-    return ProviderRequestGate.forUri(uri).run(() async {
+      };
+      if (includeBearings && bearingsParam != null) {
+        params['bearings'] = bearingsParam;
+      }
+      return _base.replace(
+        path: '$path/route/v1/driving/$coordinates',
+        queryParameters: params,
+      );
+    }
+
+    final initialUri = buildUri(includeBearings: true);
+    return ProviderRequestGate.forUri(initialUri).run(() async {
       _checkActive();
       try {
-        final response = await _client.get(
-          uri,
+        var response = await _client.get(
+          initialUri,
           headers: const {
             'Accept': 'application/json',
             'User-Agent': 'Darb-Baghdad-Navigator/1.0 (Android; OpenStreetMap)',
           },
         ).timeout(const Duration(seconds: 20));
         _checkActive();
-        if (response.statusCode == 429) {
-          throw const ProviderException(
-            'rate_limit',
-            'The routing server is busy. Wait a moment and try again.',
-            'خادم المسارات مشغول. انتظر قليلاً ثم حاول مجدداً.',
-          );
-        }
+
         Map<String, dynamic>? payload;
         try {
           final decoded = jsonDecode(utf8.decode(response.bodyBytes));
@@ -114,7 +124,33 @@ class RoutingService {
         } on FormatException {
           // Preserve HTTP status errors when upstream proxies return HTML.
         }
-        final code = payload?['code'];
+
+        var code = payload?['code'];
+        // If bearing was too restrictive to find a road segment, fallback to unconstrained query
+        if ((code == 'NoRoute' || code == 'NoSegment') && bearingsParam != null) {
+          final fallbackUri = buildUri(includeBearings: false);
+          response = await _client.get(
+            fallbackUri,
+            headers: const {
+              'Accept': 'application/json',
+              'User-Agent': 'Darb-Baghdad-Navigator/1.0 (Android; OpenStreetMap)',
+            },
+          ).timeout(const Duration(seconds: 20));
+          _checkActive();
+          try {
+            final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+            if (decoded is Map<String, dynamic>) payload = decoded;
+          } on FormatException {}
+          code = payload?['code'];
+        }
+
+        if (response.statusCode == 429) {
+          throw const ProviderException(
+            'rate_limit',
+            'The routing server is busy. Wait a moment and try again.',
+            'خادم المسارات مشغول. انتظر قليلاً ثم حاول مجدداً.',
+          );
+        }
         if (code == 'NoRoute' || code == 'NoSegment') {
           throw const ProviderException(
             'no_route',

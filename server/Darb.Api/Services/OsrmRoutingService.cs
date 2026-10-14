@@ -7,7 +7,7 @@ namespace Darb.Api.Services;
 
 public interface IOsrmRoutingService
 {
-    Task<List<RouteResultDto>> GetRoutesAsync(double fromLon, double fromLat, double toLon, double toLat, bool alternatives = true, CancellationToken cancellationToken = default);
+    Task<List<RouteResultDto>> GetRoutesAsync(double fromLon, double fromLat, double toLon, double toLat, bool alternatives = true, double? bearing = null, CancellationToken cancellationToken = default);
 }
 
 public class OsrmRoutingService : IOsrmRoutingService
@@ -33,23 +33,48 @@ public class OsrmRoutingService : IOsrmRoutingService
         double fromLon, double fromLat,
         double toLon, double toLat,
         bool alternatives = true,
+        double? bearing = null,
         CancellationToken cancellationToken = default)
     {
         var osrmBaseUrl = _config["OSRM_BASE_URL"] ?? "http://osrm:5000";
-        var uri = $"{osrmBaseUrl.TrimEnd('/')}/route/v1/driving/{fromLon.ToString(System.Globalization.CultureInfo.InvariantCulture)},{fromLat.ToString(System.Globalization.CultureInfo.InvariantCulture)};{toLon.ToString(System.Globalization.CultureInfo.InvariantCulture)},{toLat.ToString(System.Globalization.CultureInfo.InvariantCulture)}?alternatives={(alternatives ? "true" : "false")}&steps=true&geometries=geojson&overview=full";
+        var coordStr = $"{fromLon.ToString(System.Globalization.CultureInfo.InvariantCulture)},{fromLat.ToString(System.Globalization.CultureInfo.InvariantCulture)};{toLon.ToString(System.Globalization.CultureInfo.InvariantCulture)},{toLat.ToString(System.Globalization.CultureInfo.InvariantCulture)}";
 
-        JsonDocument doc;
+        string BuildUrl(bool withBearing)
+        {
+            var bearingParam = withBearing && bearing.HasValue ? $"&bearings={Math.Round((bearing.Value % 360 + 360) % 360)},60;" : "";
+            return $"{osrmBaseUrl.TrimEnd('/')}/route/v1/driving/{coordStr}?alternatives={(alternatives ? "true" : "false")}&steps=true&geometries=geojson&overview=full{bearingParam}";
+        }
+
+        JsonDocument? doc = null;
         try
         {
-            var response = await _httpClient.GetAsync(uri, cancellationToken);
-            if (!response.IsSuccessStatusCode)
+            var response = await _httpClient.GetAsync(BuildUrl(bearing.HasValue), cancellationToken);
+            if (response.IsSuccessStatusCode)
             {
-                _logger.LogWarning("OSRM responded with status {StatusCode}", response.StatusCode);
-                return [];
+                var content = await response.Content.ReadAsStringAsync(cancellationToken);
+                var parsed = JsonDocument.Parse(content);
+                if (parsed.RootElement.TryGetProperty("code", out var c) && c.GetString() == "Ok")
+                {
+                    doc = parsed;
+                }
             }
 
-            var content = await response.Content.ReadAsStringAsync(cancellationToken);
-            doc = JsonDocument.Parse(content);
+            // Fallback without bearing if bearing was too strict or returned NoRoute / NoSegment
+            if (doc == null && bearing.HasValue)
+            {
+                var fallbackRes = await _httpClient.GetAsync(BuildUrl(false), cancellationToken);
+                if (fallbackRes.IsSuccessStatusCode)
+                {
+                    var content = await fallbackRes.Content.ReadAsStringAsync(cancellationToken);
+                    doc = JsonDocument.Parse(content);
+                }
+            }
+
+            if (doc == null)
+            {
+                _logger.LogWarning("OSRM could not find route for coordinates");
+                return [];
+            }
         }
         catch (Exception ex)
         {

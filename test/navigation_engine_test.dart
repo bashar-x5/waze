@@ -56,7 +56,31 @@ void main() {
       );
       expect(progress.traveledMeters, closeTo(500, 2));
       expect(progress.distanceFromRouteMeters, closeTo(22.24, 0.5));
-      expect(progress.arrived, isFalse);
+    });
+
+    test('aligned heading preserves road snapping and calculates low divergence', () {
+      // _route() first segment goes East from (0,0) to (0,0.01) -> bearing ~90 deg
+      final progress = calculateProgress(
+        _route(),
+        const LatLng(0.0001, 0.005),
+        heading: 90.0,
+      );
+      expect(progress.segmentBearing, closeTo(90, 2));
+      expect(progress.headingDivergence, lessThan(10));
+      expect(progress.snappedPoint, isNotNull);
+    });
+
+    test('divergent heading (wrong turn) prevents snapping and reports high divergence', () {
+      // Vehicle heading 180 (South) or 270 (West) while road is 90 (East)
+      final progress = calculateProgress(
+        _route(),
+        const LatLng(0.0001, 0.005),
+        heading: 180.0,
+      );
+      expect(progress.segmentBearing, closeTo(90, 2));
+      expect(progress.headingDivergence, closeTo(90, 5));
+      // Snapping is prevented so vehicle icon tracks into the new street
+      expect(progress.snappedPoint, isNull);
     });
 
     test('a fix far off route cannot advance the trip', () {

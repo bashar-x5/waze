@@ -88,6 +88,21 @@ void main() {
       service.dispose();
     });
 
+    test('fetchRoutes transmits bearing parameter when supplied', () async {
+      final client = MockClient((request) async {
+        expect(request.url.queryParameters['bearing'], '135');
+        return http.Response.bytes(utf8.encode('[]'), 200);
+      });
+
+      final service = DarbApiService(client: client, baseUrl: 'http://localhost:5000');
+      await service.fetchRoutes(
+        const LatLng(33.3152, 44.3661),
+        const LatLng(33.3406, 44.4009),
+        bearing: 135.2,
+      );
+      service.dispose();
+    });
+
     test('reportIncident and confirmIncident invoke correct endpoints', () async {
       final client = MockClient((request) async {
         if (request.url.path == '/api/traffic/incidents') {

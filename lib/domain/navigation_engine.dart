@@ -13,6 +13,8 @@ class NavigationProgress {
     required this.stepIndex,
     required this.arrived,
     this.snappedPoint,
+    this.segmentBearing,
+    this.headingDivergence,
   });
 
   final double traveledMeters;
@@ -22,6 +24,8 @@ class NavigationProgress {
   final int stepIndex;
   final bool arrived;
   final LatLng? snappedPoint;
+  final double? segmentBearing;
+  final double? headingDivergence;
 }
 
 /// Matches a location to the route's segments, rather than its vertices.
@@ -33,6 +37,7 @@ NavigationProgress calculateProgress(
   DriveRoute route,
   LatLng position, {
   double previousMeters = 0,
+  double? heading,
 }) {
   const measure = Distance(roundResult: false);
   final segments = <_Segment>[];
@@ -107,6 +112,16 @@ NavigationProgress calculateProgress(
     traveled = totalMeters;
     remaining = 0;
   }
+  double? headingDivergence;
+  if (heading != null && heading.isFinite && heading >= 0) {
+    headingDivergence =
+        ((heading - matched.segmentBearing + 180) % 360 - 180).abs();
+  }
+
+  // Only snap vehicle if heading is roughly aligned (<= 50°) or if vehicle is stationary/heading unknown
+  final allowSnap = headingDivergence == null || headingDivergence <= 50;
+  final snapped = (matched.distance <= 45 && allowSnap) ? matched.snapped : null;
+
   return NavigationProgress(
     traveledMeters: traveled,
     remainingMeters: remaining,
@@ -114,7 +129,9 @@ NavigationProgress calculateProgress(
     distanceFromRouteMeters: matched.distance,
     stepIndex: _stepAt(route, traveled, arrived),
     arrived: arrived,
-    snappedPoint: matched.distance <= 45 ? matched.snapped : null,
+    snappedPoint: snapped,
+    segmentBearing: matched.segmentBearing,
+    headingDivergence: headingDivergence,
   );
 }
 
@@ -137,6 +154,16 @@ class _Segment {
   final LatLng to;
   final double startMeters;
   final double lengthMeters;
+
+  double get bearing {
+    const radians = math.pi / 180;
+    final dy = (to.latitude - from.latitude) * radians;
+    final dx = _longitudeDelta(to.longitude - from.longitude) *
+        radians *
+        math.cos((from.latitude + to.latitude) / 2 * radians);
+    final deg = math.atan2(dx, dy) * 180 / math.pi;
+    return (deg + 360) % 360;
+  }
 
   _Match project(LatLng position) {
     const radians = math.pi / 180;
@@ -171,15 +198,17 @@ class _Segment {
       startMeters + lengthMeters * fraction,
       math.sqrt(deltaX * deltaX + deltaY * deltaY),
       LatLng(snappedLat, snappedLng),
+      bearing,
     );
   }
 }
 
 class _Match {
-  const _Match(this.along, this.distance, this.snapped);
+  const _Match(this.along, this.distance, this.snapped, this.segmentBearing);
   final double along;
   final double distance;
   final LatLng snapped;
+  final double segmentBearing;
 }
 
 double _longitudeDelta(double value) => (value + 180) % 360 - 180;
