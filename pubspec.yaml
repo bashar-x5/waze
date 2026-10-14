@@ -1,0 +1,32 @@
+name: darb
+description: 'Darb — an Iraq-first, bilingual community navigation app.'
+publish_to: 'none'
+version: 0.1.0+1
+
+environment:
+  sdk: ^3.12.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  maplibre_gl: ^0.27.1
+  latlong2: ^0.10.1
+  geolocator: ^14.1.1
+  flutter_tts: ^4.2.5
+  http: ^1.6.0
+  shared_preferences: ^2.5.4
+  supabase_flutter: ^2.18.2
+  url_launcher: ^6.3.2
+  path_provider: ^2.1.6
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/map_styles/

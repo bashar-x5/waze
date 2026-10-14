@@ -1,0 +1,68 @@
+services:
+  # 1. PostgreSQL 16 with PostGIS 3.4 Spatial Extensions (ARM64 & AMD64)
+  db:
+    image: kartoza/postgis:16-3.4
+    container_name: darb-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: darb_traffic
+      POSTGRES_USER: darb_user
+      POSTGRES_PASS: darb_secure_pass_2026
+      POSTGRES_PASSWORD: darb_secure_pass_2026
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - darb_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U darb_user -d darb_traffic || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - darb-net
+
+  # 2. OSRM Routing Engine (MLD Algorithm with Iraq OpenStreetMap extract)
+  osrm:
+    image: ghcr.io/project-osrm/osrm-backend:v5.27.1
+    container_name: darb-osrm
+    restart: unless-stopped
+    command: osrm-routed --algorithm mld /data/iraq-latest.osrm --max-matching-size 1000 --max-table-size 1000
+    volumes:
+      - ./server/data/osrm:/data:ro
+    ports:
+      - "127.0.0.1:5001:5000"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:5000/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    networks:
+      - darb-net
+
+
+  # 4. ASP.NET Core 10 Web API (Routing Proxy, Traffic Ingestion, PostGIS Aggregation)
+  api:
+    build:
+      context: ./server/Darb.Api
+      dockerfile: Dockerfile
+    container_name: darb-api
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__DefaultConnection: "Host=db;Port=5432;Database=darb_traffic;Username=darb_user;Password=darb_secure_pass_2026"
+      Osrm__BaseUrl: "http://osrm:5000"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - darb-net
+
+volumes:
+  darb_pgdata:
+    driver: local
+
+networks:
+  darb-net:
+    driver: bridge
