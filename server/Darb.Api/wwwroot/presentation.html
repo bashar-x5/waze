@@ -1,0 +1,1375 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>درب (Darb) — العرض التقديمي الشامل لإمكانيات التطبيق</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-dark: #070B10;
+      --bg-card: rgba(16, 23, 34, 0.85);
+      --primary: #00D2FF;
+      --primary-glow: rgba(0, 210, 255, 0.35);
+      --cyan: #00C8F8;
+      --blue: #007AFF;
+      --amber: #FFB300;
+      --red: #FF3D00;
+      --green: #00E676;
+      --purple: #7C4DFF;
+      --text: #F0F4F8;
+      --text-muted: #8A99AD;
+      --border: rgba(0, 210, 255, 0.2);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-dark);
+      background-image: 
+        radial-gradient(circle at 15% 20%, rgba(0, 210, 255, 0.08) 0%, transparent 40%),
+        radial-gradient(circle at 85% 80%, rgba(124, 77, 255, 0.08) 0%, transparent 40%),
+        linear-gradient(180deg, #070B10 0%, #0A0F17 100%);
+      color: var(--text);
+      font-family: 'Cairo', sans-serif;
+      min-height: 100vh;
+      overflow-x: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Top Presentation Bar */
+    header {
+      background: rgba(10, 15, 23, 0.9);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--border);
+      padding: 12px 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand-icon {
+      width: 44px;
+      height: 44px;
+      background: linear-gradient(135deg, #00D2FF, #007AFF);
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 20px var(--primary-glow);
+    }
+
+    .brand-icon svg {
+      width: 24px;
+      height: 24px;
+      fill: #fff;
+    }
+
+    .brand-info h1 {
+      font-size: 20px;
+      font-weight: 900;
+      letter-spacing: -0.5px;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .brand-badge {
+      font-size: 11px;
+      background: rgba(0, 210, 255, 0.15);
+      color: var(--primary);
+      padding: 2px 8px;
+      border-radius: 20px;
+      border: 1px solid rgba(0, 210, 255, 0.3);
+      font-weight: 700;
+    }
+
+    .brand-sub {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    /* Timeline Stepper */
+    .timeline {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(255, 255, 255, 0.03);
+      padding: 6px 12px;
+      border-radius: 30px;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .step-dot {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: 800;
+      cursor: pointer;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      border: 1px solid transparent;
+    }
+
+    .step-dot:hover {
+      background: rgba(0, 210, 255, 0.2);
+      color: #fff;
+    }
+
+    .step-dot.active {
+      background: linear-gradient(135deg, #00D2FF, #007AFF);
+      color: #fff;
+      box-shadow: 0 0 16px var(--primary-glow);
+      transform: scale(1.1);
+      border-color: #fff;
+    }
+
+    /* Controls */
+    .controls {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .btn {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      color: #fff;
+      padding: 8px 16px;
+      border-radius: 12px;
+      font-size: 13px;
+      font-weight: 700;
+      font-family: inherit;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.2s;
+    }
+
+    .btn:hover {
+      background: rgba(255, 255, 255, 0.12);
+      border-color: rgba(255, 255, 255, 0.3);
+      transform: translateY(-1px);
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #00D2FF, #007AFF);
+      border: none;
+      color: #070B10;
+      font-weight: 900;
+      box-shadow: 0 0 20px var(--primary-glow);
+    }
+
+    .btn-primary:hover {
+      background: linear-gradient(135deg, #33DCFF, #1A8CFF);
+      color: #000;
+      box-shadow: 0 0 26px var(--primary-glow);
+    }
+
+    /* Presentation Screen Container */
+    main {
+      flex: 1;
+      display: flex;
+      position: relative;
+      overflow: hidden;
+      padding: 24px;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .slide {
+      position: absolute;
+      width: calc(100% - 48px);
+      max-width: 1300px;
+      height: calc(100% - 48px);
+      display: flex;
+      align-items: center;
+      opacity: 0;
+      transform: translateX(60px) scale(0.98);
+      pointer-events: none;
+      transition: all 0.6s cubic-bezier(0.2, 0.8, 0.2, 1);
+    }
+
+    .slide.active {
+      opacity: 1;
+      transform: translateX(0) scale(1);
+      pointer-events: auto;
+    }
+
+    /* 2-Column Presentation Layout */
+    .slide-grid {
+      display: grid;
+      grid-template-columns: 1.15fr 0.85fr;
+      gap: 36px;
+      width: 100%;
+      height: 100%;
+      align-items: center;
+    }
+
+    .slide-info {
+      padding: 20px 0;
+    }
+
+    .slide-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      font-weight: 800;
+      text-transform: uppercase;
+      padding: 4px 12px;
+      border-radius: 20px;
+      margin-bottom: 16px;
+      border: 1px solid;
+    }
+
+    .tag-cyan { background: rgba(0, 210, 255, 0.12); color: #00D2FF; border-color: rgba(0, 210, 255, 0.3); }
+    .tag-green { background: rgba(0, 230, 118, 0.12); color: #00E676; border-color: rgba(0, 230, 118, 0.3); }
+    .tag-amber { background: rgba(255, 179, 0, 0.12); color: #FFB300; border-color: rgba(255, 179, 0, 0.3); }
+    .tag-purple { background: rgba(124, 77, 255, 0.12); color: #7C4DFF; border-color: rgba(124, 77, 255, 0.3); }
+    .tag-red { background: rgba(255, 61, 0, 0.12); color: #FF3D00; border-color: rgba(255, 61, 0, 0.3); }
+
+    .slide-title {
+      font-size: 38px;
+      font-weight: 900;
+      line-height: 1.25;
+      margin-bottom: 18px;
+      color: #fff;
+    }
+
+    .slide-title span {
+      background: linear-gradient(135deg, #00D2FF, #00E676);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .slide-desc {
+      font-size: 16px;
+      line-height: 1.8;
+      color: #C0CDDC;
+      margin-bottom: 24px;
+    }
+
+    .feature-list {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      margin-bottom: 24px;
+    }
+
+    .feature-item {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 14px;
+      padding: 12px 14px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      transition: all 0.3s;
+    }
+
+    .feature-item:hover {
+      background: rgba(255, 255, 255, 0.06);
+      border-color: rgba(0, 210, 255, 0.3);
+      transform: translateY(-2px);
+    }
+
+    .feature-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      flex-shrink: 0;
+      background: rgba(0, 210, 255, 0.1);
+      border: 1px solid rgba(0, 210, 255, 0.2);
+    }
+
+    .feature-text b {
+      display: block;
+      font-size: 13px;
+      color: #fff;
+      font-weight: 800;
+    }
+
+    .feature-text span {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    /* Visual Showcase Frame */
+    .slide-visual {
+      height: 100%;
+      max-height: 580px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 28px;
+      overflow: hidden;
+      position: relative;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6), 0 0 30px rgba(0, 210, 255, 0.1);
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Mobile Device Frame */
+    .phone-mockup {
+      width: 280px;
+      height: 540px;
+      margin: auto;
+      background: #000;
+      border-radius: 40px;
+      border: 8px solid #1C232E;
+      box-shadow: 0 25px 60px rgba(0, 0, 0, 0.8), 0 0 40px rgba(0, 210, 255, 0.2);
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .phone-notch {
+      width: 100px;
+      height: 18px;
+      background: #1C232E;
+      position: absolute;
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      border-bottom-left-radius: 12px;
+      border-bottom-right-radius: 12px;
+      z-index: 100;
+    }
+
+    .phone-screen {
+      flex: 1;
+      background: #0D131C;
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Voice Wave Visualizer */
+    .wave-container {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      height: 70px;
+      margin: 20px 0;
+    }
+
+    .wave-bar {
+      width: 6px;
+      height: 18px;
+      background: var(--primary);
+      border-radius: 4px;
+      animation: wavePulse 1.2s infinite ease-in-out;
+    }
+
+    .wave-bar:nth-child(2) { animation-delay: 0.15s; height: 35px; background: #00E676; }
+    .wave-bar:nth-child(3) { animation-delay: 0.3s; height: 55px; background: #00D2FF; }
+    .wave-bar:nth-child(4) { animation-delay: 0.45s; height: 40px; background: #7C4DFF; }
+    .wave-bar:nth-child(5) { animation-delay: 0.6s; height: 20px; background: #FFB300; }
+
+    @keyframes wavePulse {
+      0%, 100% { transform: scaleY(0.4); opacity: 0.6; }
+      50% { transform: scaleY(1.4); opacity: 1; }
+    }
+
+    /* Auto Play Progress Bar (Fixed at top) */
+    .progress-track {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 4px;
+      background: rgba(255, 255, 255, 0.1);
+      z-index: 2000;
+    }
+
+    .progress-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #00D2FF, #00E676);
+      transition: width 0.1s linear;
+    }
+
+    /* Android Auto Display Card */
+    .auto-display {
+      background: #0A0E14;
+      border: 3px solid #232B38;
+      border-radius: 18px;
+      padding: 16px;
+      width: 90%;
+      margin: auto;
+      box-shadow: 0 16px 36px rgba(0, 0, 0, 0.7);
+    }
+
+    /* Mobile Bottom Navigation Bar (Hidden on desktop) */
+    .mobile-bottom-bar {
+      display: none;
+    }
+
+    /* ========================================================= */
+    /* Comprehensive Mobile Responsive Styles (Phones & Tablets) */
+    /* ========================================================= */
+    @media (max-width: 900px) {
+      body {
+        min-height: 100vh;
+        height: auto;
+        overflow-x: hidden;
+        overflow-y: auto;
+        display: block;
+      }
+
+      header {
+        padding: 10px 14px;
+        flex-direction: column;
+        gap: 10px;
+        position: sticky;
+        top: 0;
+        z-index: 1000;
+        width: 100%;
+        background: rgba(10, 15, 23, 0.95);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+      }
+
+      .brand {
+        width: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+      }
+
+      .brand-icon {
+        width: 36px;
+        height: 36px;
+        border-radius: 10px;
+        flex-shrink: 0;
+      }
+
+      .brand-icon svg {
+        width: 18px;
+        height: 18px;
+      }
+
+      .brand-info {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .brand-info h1 {
+        font-size: 16px;
+        margin: 0;
+      }
+
+      .brand-badge {
+        font-size: 10px;
+        padding: 2px 7px;
+      }
+
+      .brand-sub {
+        display: none; /* Hide verbose subtitle on small mobile header */
+      }
+
+      .timeline {
+        width: 100%;
+        justify-content: center;
+        padding: 5px 8px;
+        gap: 8px;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+      }
+
+      .step-dot {
+        width: 32px;
+        height: 32px;
+        font-size: 12px;
+        flex-shrink: 0;
+      }
+
+      /* Hide bulky desktop buttons from top header on mobile */
+      .controls {
+        display: none !important;
+      }
+
+      /* Floating Glassmorphic Mobile Bottom Bar */
+      .mobile-bottom-bar {
+        display: flex !important;
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: rgba(10, 15, 23, 0.96);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border-top: 1px solid var(--border);
+        padding: 10px 14px;
+        padding-bottom: max(12px, env(safe-area-inset-bottom));
+        z-index: 1200;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.8);
+      }
+
+      main {
+        padding: 16px 14px 100px 14px;
+        display: block;
+        min-height: auto;
+        height: auto;
+        overflow: visible;
+        position: static;
+      }
+
+      .slide {
+        position: relative;
+        width: 100%;
+        height: auto;
+        opacity: 0;
+        display: none;
+        transform: none !important;
+        transition: opacity 0.35s ease;
+      }
+
+      .slide.active {
+        opacity: 1;
+        display: block;
+      }
+
+      .slide-grid {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+        height: auto;
+        width: 100%;
+      }
+
+      .slide-info {
+        padding: 0;
+        width: 100%;
+      }
+
+      .slide-tag {
+        font-size: 11px;
+        padding: 4px 10px;
+        margin-bottom: 12px;
+      }
+
+      .slide-title {
+        font-size: 23px;
+        line-height: 1.35;
+        margin-bottom: 12px;
+      }
+
+      .slide-desc {
+        font-size: 14px;
+        line-height: 1.75;
+        margin-bottom: 18px;
+      }
+
+      .feature-list {
+        grid-template-columns: 1fr;
+        gap: 10px;
+        margin-bottom: 18px;
+      }
+
+      .feature-item {
+        padding: 12px 14px;
+        border-radius: 14px;
+      }
+
+      .feature-icon {
+        width: 34px;
+        height: 34px;
+        font-size: 17px;
+      }
+
+      .feature-text b {
+        font-size: 13px;
+      }
+
+      .feature-text span {
+        font-size: 11px;
+      }
+
+      .slide-visual {
+        max-height: none;
+        min-height: 280px;
+        border-radius: 22px;
+        width: 100%;
+        padding: 18px 12px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      }
+
+      .slide-visual img {
+        width: 100%;
+        height: auto;
+        max-height: 360px;
+        object-fit: cover;
+        border-radius: 18px;
+      }
+
+      .phone-mockup {
+        width: 270px;
+        height: 490px;
+        max-width: 90vw;
+        border-width: 6px;
+        border-radius: 32px;
+        margin: 0 auto;
+      }
+
+      .auto-display {
+        width: 100%;
+        padding: 14px 10px;
+      }
+
+      .wave-container {
+        height: 50px;
+        margin: 14px 0;
+      }
+
+      .swipe-guide {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        font-size: 11px;
+        color: var(--text-muted);
+        margin-top: 14px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Presentation Header Bar -->
+  <header>
+    <div class="brand">
+      <div class="brand-icon">
+        <svg viewBox="0 0 24 24"><path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"/></svg>
+      </div>
+      <div class="brand-info">
+        <h1><span>تطبيق دَرب (Darb)</span> <span class="brand-badge">إصدار v1.0.6</span></h1>
+        <div class="brand-sub">نظام الملاحة الذكي والمجتمعي الأول في العراق • 100% مجاني وبدون تكاليف API</div>
+      </div>
+    </div>
+
+    <!-- Stepper Navigation -->
+    <div class="timeline" id="timeline-stepper">
+      <div class="step-dot active" onclick="goToSlide(0)" title="المقدمة والرؤية">1</div>
+      <div class="step-dot" onclick="goToSlide(1)" title="القمر الصناعي ثلاثي الأبعاد">2</div>
+      <div class="step-dot" onclick="goToSlide(2)" title="الأوامر الصوتية العراقية">3</div>
+      <div class="step-dot" onclick="goToSlide(3)" title="شاشات السيارات Android Auto">4</div>
+      <div class="step-dot" onclick="goToSlide(4)" title="رصد المطبات والحوادث">5</div>
+      <div class="step-dot" onclick="goToSlide(5)" title="ذاكرة ركن السيارة">6</div>
+      <div class="step-dot" onclick="goToSlide(6)" title="لوحة العمليات والتحميل">7</div>
+    </div>
+
+    <!-- Actions & Autoplay Controls -->
+    <div class="controls">
+      <button class="btn" id="btn-sound" onclick="toggleSpeech()">
+        <span id="sound-icon">🔊</span> <span id="sound-txt">تشغيل الصوت</span>
+      </button>
+      <button class="btn" id="btn-play" onclick="toggleAutoPlay()">
+        <span id="play-icon">⏸️</span> <span id="play-txt">إيقاف مؤقت</span>
+      </button>
+      <button class="btn" onclick="prevSlide()">السابق</button>
+      <button class="btn btn-primary" onclick="nextSlide()">التالي ←</button>
+    </div>
+  </header>
+
+  <!-- Presentation Viewport -->
+  <main id="presentation-viewport">
+
+    <!-- SLIDE 1: Hero & Vision -->
+    <div class="slide active" id="slide-0">
+      <div class="slide-grid">
+        <div class="slide-info">
+          <div class="slide-tag tag-cyan">🚀 الرؤية والريادة الرقمية</div>
+          <h2 class="slide-title">دَرب: ملاحة مجتمعية ذكية <span>مُصممة خصيصاً للعراق</span></h2>
+          <p class="slide-desc">
+            البديل العراقي الحر والمتكامل لتطبيق Waze و Google Maps. تطبيق ملاحة وطني بنسبة 100% يوفر أحدث تقنيات الخرائط المتجهة ثلاثية الأبعاد بدون أي اشتراكات شهرية أو تكاليف API سحابية مدفوعة، مع توجيه دقيق يراعي خصوصية الشارع العراقي.
+          </p>
+          <div class="feature-list">
+            <div class="feature-item">
+              <div class="feature-icon">💸</div>
+              <div class="feature-text">
+                <b>صفر تكاليف API سحابية</b>
+                <span>محرك خرائط متجهة OpenFreeMap مجاني مدى الحياة</span>
+              </div>
+            </div>
+            <div class="feature-item">
+              <div class="feature-icon">🇮🇶</div>
+              <div class="feature-text">
+                <b>عراقي المنشأ والهوية</b>
+                <span>يدعم التسميات المحلية والبغدادية بدقة تامة</span>
+              </div>
+            </div>
+            <div class="feature-item">
+              <div class="feature-icon">⚡</div>
+              <div class="feature-text">
+                <b>محرك توجيه OSRM محلي</b>
+                <span>استجابة فائقة السرعة بزمن استجابة أقل من 2ms</span>
+              </div>
+            </div>
+            <div class="feature-item">
+              <div class="feature-icon">🛡️</div>
+              <div class="feature-text">
+                <b>خصوصية كاملة وأمان تام</b>
+                <span>لا تتبع تجاري للبيانات ولا إعلانات مزعجة</span>
+              </div>
+            </div>
+          </div>
+          <button class="btn btn-primary" onclick="nextSlide()">
+            <span>استكشف الإمكانيات الكاملة</span> <span>←</span>
+          </button>
+        </div>
+
+        <!-- Visual Hero Card -->
+        <div class="slide-visual" style="justify-content: center; align-items: center; background: radial-gradient(circle, rgba(0,210,255,0.12) 0%, rgba(10,14,20,0.95) 70%);">
+          <div style="text-align: center; padding: 30px;">
+            <div style="width: 110px; height: 110px; background: linear-gradient(135deg, #00D2FF, #007AFF); border-radius: 32px; margin: 0 auto 20px; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 50px rgba(0, 210, 255, 0.5);">
+              <svg viewBox="0 0 24 24" style="width: 55px; height: 55px; fill: #fff;"><path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"/></svg>
+            </div>
+            <h3 style="font-size: 28px; font-weight: 900; color: #fff; margin-bottom: 6px;">دَرب • DARB NAVIGATION</h3>
+            <p style="color: var(--primary); font-size: 14px; font-weight: 700; margin-bottom: 24px;">Community-Powered Live GPS Navigation for Iraq</p>
+            <div style="display: flex; gap: 10px; justify-content: center;">
+              <span style="background: rgba(255,255,255,0.06); padding: 6px 14px; border-radius: 20px; font-size: 12px; border: 1px solid rgba(255,255,255,0.1);">Android & Auto</span>
+              <span style="background: rgba(0,230,118,0.15); color: #00E676; padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: 800;">Free & Open Source</span>
+              <span style="background: rgba(0,210,255,0.15); color: var(--primary); padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: 800;">3D OpenGL Engine</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SLIDE 2: 3D Satellite & Extruded Buildings -->
+    <div class="slide" id="slide-1">
+      <div class="slide-grid">
+        <div class="slide-info">
+          <div class="slide-tag tag-cyan">🛰️ خرائط المستقبل</div>
+          <h2 class="slide-title">قمر صناعي حقيقي مدمج مع <span>المباني ثلاثية الأبعاد 3D</span></h2>
+          <p class="slide-desc">
+            تجربة بصرية مذهلة تجمع بين الدقة الفوتوغرافية لأقمار Esri الصناعية فائقة الدقة وبين التجسيم الهندسي للمباني والشوارع. استمتع بملاحة تحاكي الواقع وتسهل التعرف على المعالم والأبنية في بغداد.
+          </p>
+          <div class="feature-list">
+            <div class="feature-item">
+              <div class="feature-icon">🏢</div>
+              <div class="feature-text">
+                <b>تجسيم المباني الفعلي (3D Buildings)</b>
+                <span>ارتفاعات واقعية مأخوذة من بيانات المسح المعماري</span>
+              </div>
+            </div>
+            <div class="feature-item">
+              <div class="feature-icon">🛰️</div>
+              <div class="feature-text">
+                <b>صور أقمار Esri العالمية</b>
+                <span>أعلى دقة تصوير فضائي بدون أي اشتراكات سحابية</span>
+              </div>
+            </div>
+            <div class="feature-item">
+              <div class="feature-icon">📍</div>
+              <div class="feature-text">
+                <b>مؤشر موقع ذكي وثابت</b>
+                <span>يظل مثبتاً على موقعك الجغرافي حتى أثناء تصفح الخريطة باليد</span>
+              </div>
+            </div>
+            <div class="feature-item">
+              <div class="feature-icon">🎮</div>
+              <div class="feature-text">
+                <b>تحكم إيمائي بزاوية الرؤية (60° Tilt)</b>
+                <span>دوران وميلان إيمائي يحاكي أحدث ألعاب السيارات والـ 3D</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3D Satellite Real Screenshot Showcase -->
+        <div class="slide-visual" style="padding: 0; background: #000;">
+          <img src="/satellite_3d.jpg" alt="Darb 3D Satellite View" style="width: 100%; height: 100%; object-fit: cover; border-radius: 28px;">
+          <div style="position: absolute; bottom: 16px; right: 16px; left: 16px; background: rgba(10,14,20,0.85); backdrop-filter: blur(12px); padding: 12px 18px; border-radius: 16px; border: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <b style="color: #fff; font-size: 13px;">🛰️ منظر القمر الصناعي + المباني المجسمة</b>
+              <div style="font-size: 11px; color: var(--text-muted);">بغداد • حي المنصور ومحيطه بتقنية MapLibre GL 3D</div>
+            </div>
+            <span style="background: rgba(0,210,255,0.15); color: var(--primary); font-size: 11px; font-weight: 800; padding: 4px 10px; border-radius: 10px;">OpenGL 60 FPS</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SLIDE 3: Iraqi Voice Commands -->
+    <div class="slide" id="slide-2">
+      <div class="slide-grid">
+        <div class="slide-info">
+          <div class="slide-tag tag-green">🎙️ الذكاء الصوتي</div>
+          <h2 class="slide-title">الملاحة الصوتية <span>باللهجة العراقية الطبيعية</span></h2>
+          <p class="slide-desc">
+            تحدث بحرية وبدون حواجز لغوية! يفهم درب لهجة السائق العراقي بذكاء اصطناعي محلي فائق الدقة. فقط اضغط زر المايك وقل: "اريد الذهاب لمطعم رويال كالاكسي في المنصور"، وسينطلق التوجيه فوراً.
+          </p>
+          <div class="feature-list">
+            <div class="feature-item">
+              <div class="feature-icon">🗣️</div>
+              <div class="feature-text">
+                <b>أمثلة لعبارات يفهمها التطبيق</b>
+                <span>"وديني لمول الحارثية" • "اخذني للكرادة داخل"</span>
+              </div>
+            </div>
+            <div class="feature-item">
+              <div class="feature-icon">⚡</div>
+              <div class="feature-text">
+                <b>تخطيط مسار تلقائي وفوري</b>
+                <span>يبحث ويختار أفضل مسار ويبدأ الملاحة تلقائياً</span>
+              </div>
+            </div>
+            <div class="feature-item">
+              <div class="feature-icon">🛑</div>
+              <div class="feature-text">
+                <b>إلغاء الملاحة بالأمر الصوتي</b>
+                <span>قل "إلغاء الملاحة" أو "كافي" لإيقاف التوجيه بسلامة</span>
+              </div>
+            </div>
+            <div class="feature-item">
+              <div class="feature-icon">⚠️</div>
+              <div class="feature-text">
+                <b>الإبلاغ الصوتي عن الحوادث</b>
+                <span>"اكو حادث هنا" • "اكو سيطرة" لتنبيه السائقين بالصوت</span>
+              </div>
+            </div>
+          </div>
+          <button class="btn btn-primary" onclick="simulateVoiceCommand()">
+            <span>🔊 تجربة نطق الأمر الصوتي العراقي</span>
+          </button>
+        </div>
+
+        <!-- Voice Command Interactive Card -->
+        <div class="slide-visual" style="justify-content: center; align-items: center; padding: 30px;">
+          <div style="background: rgba(0, 210, 255, 0.05); border: 1px solid rgba(0, 210, 255, 0.25); border-radius: 24px; padding: 26px; width: 100%; max-width: 420px; text-align: center;">
+            <div style="width: 72px; height: 72px; background: linear-gradient(135deg, #00E676, #00B0FF); border-radius: 50%; margin: 0 auto 16px; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 30px rgba(0, 230, 118, 0.4);">
+              <span style="font-size: 34px;">🎙️</span>
+            </div>
+            <div style="font-size: 12px; color: var(--text-muted); font-weight: 700; margin-bottom: 6px;">أمر صوتي مباشر مُكتشف:</div>
+            <div style="font-size: 19px; font-weight: 900; color: #fff; line-height: 1.4; margin-bottom: 14px;" id="voice-phrase-display">
+              "اريد الذهاب لمطعم رويال كالاكسي في المنصور"
+            </div>
+            
+            <!-- Animated Wave -->
+            <div class="wave-container">
+              <div class="wave-bar"></div>
+              <div class="wave-bar"></div>
+              <div class="wave-bar"></div>
+              <div class="wave-bar"></div>
+              <div class="wave-bar"></div>
+            </div>
+
+            <div style="background: rgba(0,0,0,0.4); border-radius: 14px; padding: 12px; font-size: 12px; text-align: right;">
+              <div style="color: #00E676; font-weight: 800; margin-bottom: 4px;">✓ تم التعرف على الوجهة بدقة:</div>
+              <div style="color: #fff;">📍 مطعم رويال جلاكسي • شارع الأميرات، المنصور</div>
+              <div style="color: var(--text-muted); font-size: 11px; margin-top: 4px;">المسافة: 8.4 كم • الوقت المتوقع: 14 دقيقة</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SLIDE 4: Android Auto -->
+    <div class="slide" id="slide-3">
+      <div class="slide-grid">
+        <div class="slide-info">
+          <div class="slide-tag tag-purple">🚗 شاشات السيارات الذكية</div>
+          <h2 class="slide-title">دعم كامل ومباشر <span>لنظام Android Auto</span></h2>
+          <p class="slide-desc">
+            انقل تجربة درب مباشرة إلى شاشة سيارتك الترفيهية بدون الحاجة لحمل الهاتف. واجهة قيادة قياسية مُحسنة لشاشات السيارات مع أزرار لمس كبيرة وأوامر صوتية مدمجة مع مقود السيارة.
+          </p>
+          <div class="feature-list">
+            <div class="feature-item">
+              <div class="feature-icon">🧭</div>
+              <div class="feature-text">
+                <b>لوحة إرشادات علوية HUD</b>
+                <span>تنبيه بالمنعطف القادم، رقم المسار، والمسافة المتبقية</span>
+              </div>
+            </div>
+            <div class="feature-item">
+              <div class="feature-icon">🔘</div>
+              <div class="feature-text">
+                <b>تحكم بأزرار المقود</b>
+                <span>تفعيل الميكروفون والبحث الصوتي من أزرار السيارة الأصلية</span>
+              </div>
+            </div>
+            <div class="feature-item">
+              <div class="feature-icon">⚠️</div>
+              <div class="feature-text">
+                <b>إبلاغ بنقرة واحدة من الشاشة</b>
+                <span>إرسال إشعار بالمطب أو الحادث بضغطة زر سريعة وآمنة</span>
+              </div>
+            </div>
+            <div class="feature-item">
+              <div class="feature-icon">🌙</div>
+              <div class="feature-text">
+                <b>الوضع الليلي التلقائي</b>
+                <span>يتكيف سطوع الشاشة مع أضواء السيارة لتفادي إجهاد العين</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Android Auto Screen Mockup -->
+        <div class="slide-visual" style="justify-content: center; align-items: center; padding: 24px;">
+          <div class="auto-display">
+            <!-- Auto Status Bar -->
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 8px; margin-bottom: 12px; font-size: 12px;">
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span style="font-weight: 900; color: #00D2FF;">ANDROID AUTO</span>
+                <span style="background: rgba(0,210,255,0.15); color: var(--primary); padding: 1px 6px; border-radius: 6px; font-size: 10px;">Darb Infotainment</span>
+              </div>
+              <div style="color: var(--text-muted); font-family: 'JetBrains Mono', monospace;">14:32 • 28°C ☀️</div>
+            </div>
+
+            <!-- In-Car Navigation HUD Mockup -->
+            <div style="background: #121924; border-radius: 14px; padding: 14px; display: flex; align-items: center; gap: 16px; margin-bottom: 12px;">
+              <div style="width: 50px; height: 50px; background: #007AFF; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 28px;">
+                ↗️
+              </div>
+              <div style="flex: 1;">
+                <div style="font-size: 13px; color: var(--primary); font-weight: 800;">بعد 250 متر</div>
+                <div style="font-size: 16px; font-weight: 900; color: #fff;">انعطف يميناً نحو شارع 14 رمضان</div>
+              </div>
+              <div style="text-align: left; font-family: 'JetBrains Mono', monospace;">
+                <div style="font-size: 18px; font-weight: 800; color: #00E676;">12 دقيقة</div>
+                <div style="font-size: 11px; color: var(--text-muted);">6.2 كم</div>
+              </div>
+            </div>
+
+            <!-- Auto Quick Actions Bar -->
+            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;">
+              <div style="background: rgba(255,61,0,0.15); border: 1px solid rgba(255,61,0,0.3); border-radius: 10px; padding: 10px; text-align: center; font-size: 11px; font-weight: 800; color: #FF3D00;">
+                💥 حادث
+              </div>
+              <div style="background: rgba(255,179,0,0.15); border: 1px solid rgba(255,179,0,0.3); border-radius: 10px; padding: 10px; text-align: center; font-size: 11px; font-weight: 800; color: #FFB300;">
+                🛑 مطب
+              </div>
+              <div style="background: rgba(0,210,255,0.15); border: 1px solid rgba(0,210,255,0.3); border-radius: 10px; padding: 10px; text-align: center; font-size: 11px; font-weight: 800; color: #00D2FF;">
+                👮 سيطرة
+              </div>
+              <div style="background: rgba(0,230,118,0.15); border: 1px solid rgba(0,230,118,0.3); border-radius: 10px; padding: 10px; text-align: center; font-size: 11px; font-weight: 800; color: #00E676;">
+                🎙️ صوت
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SLIDE 5: Hazard Reports & Verified Speed Bumps -->
+    <div class="slide" id="slide-4">
+      <div class="slide-grid">
+        <div class="slide-info">
+          <div class="slide-tag tag-amber">🛑 الذكاء المجتمعي</div>
+          <h2 class="slide-title">رصد مباشر للمخاطر مع <span>نظام اعتماد المطبات الذكي</span></h2>
+          <p class="slide-desc">
+            شبكة مجتمعية حية يتشارك فيها السائقون مواقع المطبات الاصطناعية، الحوادث، السيطرات، وكاميرات الرادار في بغداد. يتأكد التطبيق من صحة المطب تلقائياً عبر تصويت السائقين ليبقى التحذير دائماً وموثوقاً.
+          </p>
+          <div class="feature-list">
+            <div class="feature-item">
+              <div class="feature-icon">🛑</div>
+              <div class="feature-text">
+                <b>تحذير مبكر من المطبات المفاجئة</b>
+                <span>تنبيه صوتي وبصري قبل 200 متر من المطب لحماية سيارتك</span>
+              </div>
+            </div>
+            <div class="feature-item">
+              <div class="feature-icon">👍</div>
+              <div class="feature-text">
+                <b>نظام تأكيد السائقين (3+ تأكيدات)</b>
+                <span>يتحول البلاغ إلى "مطب معتمد دائم" بعد تأكيد 3 سائقين</span>
+              </div>
+            </div>
+            <div class="feature-item">
+              <div class="feature-icon">👮</div>
+              <div class="feature-text">
+                <b>رصد السيطرات والازدحامات</b>
+                <span>تحديثات لحظية لتجنب السيطرات المزدحمة وتوفير الوقت</span>
+              </div>
+            </div>
+            <div class="feature-item">
+              <div class="feature-icon">🗑️</div>
+              <div class="feature-text">
+                <b>تنظيف تلقائي للبلاغات القديمة</b>
+                <span>إزالة تلقائية للمخاطر المؤقتة بمجرد انتهاء الازدحام</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Verified Speed Bump Dialog Showcase -->
+        <div class="slide-visual" style="justify-content: center; align-items: center; padding: 24px;">
+          <div style="background: #141C28; border: 2px solid #FFB300; border-radius: 24px; padding: 22px; width: 100%; max-width: 440px; box-shadow: 0 16px 40px rgba(0,0,0,0.6);">
+            <div style="display: flex; align-items: center; gap: 14px; margin-bottom: 14px;">
+              <div style="width: 48px; height: 48px; background: #FFB300; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 24px; color: #000; flex-shrink: 0;">
+                ⚠️
+              </div>
+              <div>
+                <h4 style="font-size: 15px; font-weight: 900; color: #fff;">🛑 هل المطب الاصطناعي لا يزال موجوداً؟</h4>
+                <div style="font-size: 11px; color: var(--text-muted);">تأكيدك يحافظ على بقاء التنبيه للسائقين القادمين خلفك</div>
+              </div>
+            </div>
+
+            <div style="background: rgba(0,0,0,0.3); border-radius: 12px; padding: 10px 14px; font-size: 12px; margin-bottom: 16px; display: flex; justify-content: space-between;">
+              <span>📍 شارع فلسطين • قرب ساحة بيروت</span>
+              <span style="color: #00E676; font-weight: 800;">✓ 4 تأكيدات سابقة</span>
+            </div>
+
+            <div style="display: flex; gap: 10px;">
+              <button class="btn" style="flex: 1; justify-content: center; border-color: #FF3D00; color: #FF3D00;">
+                ✕ غير موجود
+              </button>
+              <button class="btn btn-primary" style="flex: 1; justify-content: center; background: #00C8F8; color: #000;">
+                👍 نعم، موجود
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SLIDE 6: Smart Parking Memory -->
+    <div class="slide" id="slide-5">
+      <div class="slide-grid">
+        <div class="slide-info">
+          <div class="slide-tag tag-cyan">🅿️ المساعد الشخصي</div>
+          <h2 class="slide-title">حفظ موقع ركن السيارة <span>والعودة إليها بضغطة زر</span></h2>
+          <p class="slide-desc">
+            لن تنسى مكان ركن سيارتك في مواقف المولات أو المستشفيات بعد اليوم! فور وصولك لوجهتك، يقترح درب حفظ إحداثيات السيارة مع كتابة ملاحظة (مثل رقم البوابة أو الطابق)، ويوفر بوصلة مشي للمشاة ترشدك إليها.
+          </p>
+          <div class="feature-list">
+            <div class="feature-item">
+              <div class="feature-icon">🎯</div>
+              <div class="feature-text">
+                <b>اكتشاف تلقائي للوصول</b>
+                <span>بطاقة منبثقة تقترح حفظ الموقع فور التوقف عند الوجهة</span>
+              </div>
+            </div>
+            <div class="feature-item">
+              <div class="feature-icon">📝</div>
+              <div class="feature-text">
+                <b>ملاحظات البوابات والطوابق</b>
+                <span>اكتب "طابق B2 قرب مصعد بوابة 3" للتذكير الفوري</span>
+              </div>
+            </div>
+            <div class="feature-item">
+              <div class="feature-icon">🧭</div>
+              <div class="feature-text">
+                <b>بوصلة راجلين دقيقة</b>
+                <span>مسار مشي يرشدك خطوة بخطوة للعودة إلى مكان السيارة</span>
+              </div>
+            </div>
+            <div class="feature-item">
+              <div class="feature-icon">💾</div>
+              <div class="feature-text">
+                <b>حفظ محلي دائم بدون إنترنت</b>
+                <span>تخزين آمن ومحمي في ذاكرة الهاتف لا يضيع مع إغلاق التطبيق</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Parking Memory Card Showcase -->
+        <div class="slide-visual" style="justify-content: center; align-items: center; padding: 24px;">
+          <div style="background: #141D2B; border: 2px solid #00C8F8; border-radius: 24px; padding: 24px; width: 100%; max-width: 440px; box-shadow: 0 16px 40px rgba(0, 200, 248, 0.2);">
+            <div style="display: flex; align-items: center; gap: 14px; margin-bottom: 14px;">
+              <div style="width: 50px; height: 50px; background: rgba(0, 200, 248, 0.15); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 26px; color: #00C8F8; flex-shrink: 0;">
+                🚗
+              </div>
+              <div>
+                <h4 style="font-size: 16px; font-weight: 900; color: #fff;">مكان سيارتي المركونة</h4>
+                <div style="font-size: 11px; color: var(--text-muted);">تم الحفظ اليوم في الساعة 14:15</div>
+              </div>
+            </div>
+
+            <div style="background: rgba(0,0,0,0.35); border-radius: 14px; padding: 12px 16px; margin-bottom: 16px;">
+              <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 2px;">الملاحظة المحفوظة:</div>
+              <div style="font-size: 14px; font-weight: 800; color: #00D2FF;">🅿️ مول بغداد • مرآب الطابق الثاني - قرب بوابة رقم 4</div>
+              <div style="font-size: 12px; color: #fff; margin-top: 6px;">المسافة الحالية منك: <b>65 متراً</b></div>
+            </div>
+
+            <button class="btn btn-primary" style="width: 100%; justify-content: center; padding: 12px; font-size: 14px;">
+              <span>🧭 المشي نحو سيارتي الآن</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SLIDE 7: Live Operations & Direct Download -->
+    <div class="slide" id="slide-6">
+      <div class="slide-grid">
+        <div class="slide-info">
+          <div class="slide-tag tag-cyan">🌐 البنية التحتية والتحميل</div>
+          <h2 class="slide-title">خادم عمليات مباشر <span>وتحميل فوري برمز QR دائم</span></h2>
+          <p class="slide-desc">
+            يعمل درب على بنية تحتية سحابية مستقلة بالكامل (ASP.NET Core 10 + PostGIS 16 + OSRM) على السيرفر (139.185.47.123:5000)، مع لوحة تحكم حية لمتابعة تدفق السير وتحميل ملف التطبيق APK برمز QR دائم لا تنتهي صلاحيته أبداً.
+          </p>
+          <div class="feature-list">
+            <div class="feature-item">
+              <div class="feature-icon">📲</div>
+              <div class="feature-text">
+                <b>تحميل APK مباشر (86 MB)</b>
+                <span>تنزيل فوري بنقرة واحدة وبدون متجر أو وسيط خارجي</span>
+              </div>
+            </div>
+            <div class="feature-item">
+              <div class="feature-icon">📷</div>
+              <div class="feature-text">
+                <b>رمز QR ثابت ودائم</b>
+                <span>امسح بكاميرا الهاتف للتحميل بدون أي انتهاء صلاحية</span>
+              </div>
+            </div>
+            <div class="feature-item">
+              <div class="feature-icon">🖥️</div>
+              <div class="feature-text">
+                <b>لوحة متابعة حية لغرفة العمليات</b>
+                <span>عرض المركبات النشطة ومتوسط السرعات في العاصمة بغداد</span>
+              </div>
+            </div>
+            <div class="feature-item">
+              <div class="feature-icon">🔔</div>
+              <div class="feature-text">
+                <b>إشعارات تحديث فورية داخل التطبيق</b>
+                <span>تنبيه آلي عند صدور أي إصدار جديد وتحديث سلس</span>
+              </div>
+            </div>
+          </div>
+          <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+            <a href="/darb.apk" class="btn btn-primary" style="text-decoration: none; flex: 1 1 auto; justify-content: center;">
+              <span>📱 تحميل تطبيق دَرب الآن (APK)</span>
+            </a>
+            <a href="/" class="btn" style="text-decoration: none; flex: 1 1 auto; justify-content: center;">
+              <span>🖥️ فتح لوحة التحكم المباشرة</span>
+            </a>
+          </div>
+        </div>
+
+        <!-- QR Download Card Showcase -->
+        <div class="slide-visual" style="justify-content: center; align-items: center; padding: 30px;">
+          <div style="background: rgba(16, 23, 34, 0.95); border: 2px solid var(--primary); border-radius: 28px; padding: 26px; text-align: center; max-width: 380px; box-shadow: 0 0 40px var(--primary-glow);">
+            <div style="background: #fff; padding: 14px; border-radius: 20px; display: inline-block; margin-bottom: 16px; box-shadow: 0 8px 24px rgba(0,0,0,0.5);">
+              <img src="/qr.png" alt="Darb Permanent QR" style="width: 180px; height: 180px; display: block; image-rendering: pixelated;">
+            </div>
+            <h4 style="font-size: 18px; font-weight: 900; color: #fff; margin-bottom: 4px;">امسح بكاميرا هاتفك للتحميل</h4>
+            <div style="font-size: 11px; color: var(--primary); font-family: 'JetBrains Mono', monospace; margin-bottom: 14px;">http://139.185.47.123:5000/darb.apk</div>
+            <p style="font-size: 12px; color: var(--text-muted); line-height: 1.6;">
+              رمز QR دائم وثابت على خادم درب المباشر. حمّل التطبيق واستمتع بتجربة ملاحة عراقية حرة ومتطورة!
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Auto Progress Bar -->
+  <div class="progress-track">
+    <div class="progress-fill" id="progress-bar"></div>
+  </div>
+
+  <!-- Mobile Bottom Floating Navigation Bar -->
+  <div class="mobile-bottom-bar">
+    <button class="btn" onclick="prevSlide()" style="flex: 1; justify-content: center; padding: 10px 8px; font-size: 13px;">
+      <span>السابق</span>
+    </button>
+    <button class="btn" onclick="toggleAutoPlay()" id="btn-play-mobile" style="padding: 10px 14px;" title="تشغيل / إيقاف العرض">
+      <span id="play-icon-mobile">⏸️</span>
+    </button>
+    <button class="btn" onclick="toggleSpeech()" id="btn-sound-mobile" style="padding: 10px 14px;" title="تشغيل / كتم الصوت">
+      <span id="sound-icon-mobile">🔊</span>
+    </button>
+    <button class="btn btn-primary" onclick="nextSlide()" style="flex: 1.3; justify-content: center; padding: 10px 8px; font-size: 13px;">
+      <span>التالي ←</span>
+    </button>
+  </div>
+
+  <script>
+    const TOTAL_SLIDES = 7;
+    let currentSlide = 0;
+    let isAutoPlay = true;
+    let isSpeechEnabled = false;
+    let slideTimer = null;
+    let progressInterval = null;
+    let progressPercent = 0;
+    const SLIDE_DURATION = 9000; // 9 seconds per slide
+
+    const speechTexts = [
+      "أهلاً بكم في تطبيق دَرب، نظام الملاحة الذكي والمجتمعي الأول في العراق، مجاني مئة بالمئة وبدون أي تكاليف سحابية.",
+      "استمتع بعرض القمر الصناعي الحقيقي ثلاثي الأبعاد المدمج مع مجسمات المباني، لتحاكي شوارع بغداد بدقة متناهية.",
+      "ملاحة صوتية متطورة تفهم اللهجة العراقية، فقط قل: اريد الذهاب لمطعم رويال كالاكسي في المنصور، وسينطلق التوجيه فوراً.",
+      "دعم متكامل لشاشات السيارات أندرويد أوتو، مع لوحة إرشادات علوية وتحكم بأزرار المقود.",
+      "رصد مباشر ومجتمعي للمخاطر، مع نظام ذكي لاعتماد المطبات الاصطناعية وتنبيهك قبل مئتي متر لحماية سيارتك.",
+      "مساعد ذكي لتذكر مكان ركن السيارة في المولات مع بوصلة مشي ترشدك خطوة بخطوة للعودة إليها.",
+      "خادم عمليات متكامل ومباشر، مع إمكانية التحميل الفوري لملف التطبيق ورمز كيو آر دائم لا تنتهي صلاحيته."
+    ];
+
+    function showSlide(index) {
+      if (index < 0) index = 0;
+      if (index >= TOTAL_SLIDES) index = 0;
+      currentSlide = index;
+
+      document.querySelectorAll('.slide').forEach((s, idx) => {
+        s.classList.toggle('active', idx === currentSlide);
+      });
+
+      document.querySelectorAll('.step-dot').forEach((d, idx) => {
+        d.classList.toggle('active', idx === currentSlide);
+      });
+
+      // Reset & restart progress bar
+      progressPercent = 0;
+      document.getElementById('progress-bar').style.width = '0%';
+
+      // Scroll window to top on mobile so next slide starts from header
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+
+      // Speak narration if enabled
+      if (isSpeechEnabled && 'speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+        const text = speechTexts[currentSlide];
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = 'ar-IQ';
+        utterance.rate = 0.95;
+        window.speechSynthesis.speak(utterance);
+      }
+    }
+
+    function nextSlide() {
+      showSlide((currentSlide + 1) % TOTAL_SLIDES);
+    }
+
+    function prevSlide() {
+      showSlide((currentSlide - 1 + TOTAL_SLIDES) % TOTAL_SLIDES);
+    }
+
+    function goToSlide(index) {
+      showSlide(index);
+    }
+
+    function toggleAutoPlay() {
+      isAutoPlay = !isAutoPlay;
+      const icon = isAutoPlay ? '⏸️' : '▶️';
+      const text = isAutoPlay ? 'إيقاف مؤقت' : 'تشغيل العرض';
+      document.getElementById('play-icon').innerText = icon;
+      document.getElementById('play-txt').innerText = text;
+      const mIcon = document.getElementById('play-icon-mobile');
+      if (mIcon) mIcon.innerText = icon;
+    }
+
+    function toggleSpeech() {
+      isSpeechEnabled = !isSpeechEnabled;
+      const icon = isSpeechEnabled ? '🔇' : '🔊';
+      const text = isSpeechEnabled ? 'كتم الصوت' : 'تشغيل الصوت';
+      document.getElementById('sound-icon').innerText = icon;
+      document.getElementById('sound-txt').innerText = text;
+      const mIcon = document.getElementById('sound-icon-mobile');
+      if (mIcon) mIcon.innerText = icon;
+
+      if (isSpeechEnabled) {
+        showSlide(currentSlide);
+      } else if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
+    }
+
+    function simulateVoiceCommand() {
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+        const u = new SpeechSynthesisUtterance("اريد الذهاب لمطعم رويال كالاكسي في المنصور");
+        u.lang = 'ar-IQ';
+        u.rate = 0.9;
+        window.speechSynthesis.speak(u);
+      }
+    }
+
+    // Touch Swipe Gesture Support for Mobile
+    let touchStartX = 0;
+    let touchEndX = 0;
+    let touchStartY = 0;
+    let touchEndY = 0;
+
+    document.addEventListener('touchstart', (e) => {
+      touchStartX = e.changedTouches[0].screenX;
+      touchStartY = e.changedTouches[0].screenY;
+    }, { passive: true });
+
+    document.addEventListener('touchend', (e) => {
+      touchEndX = e.changedTouches[0].screenX;
+      touchEndY = e.changedTouches[0].screenY;
+      handleSwipe();
+    }, { passive: true });
+
+    function handleSwipe() {
+      const diffX = touchEndX - touchStartX;
+      const diffY = touchEndY - touchStartY;
+      // Ensure horizontal swipe is dominant
+      if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 40) {
+        if (diffX > 0) {
+          // Swiped right (in RTL: previous slide)
+          prevSlide();
+        } else {
+          // Swiped left (in RTL: next slide)
+          nextSlide();
+        }
+      }
+    }
+
+    // Timer Loop
+    setInterval(() => {
+      if (!isAutoPlay) return;
+      progressPercent += (100 / (SLIDE_DURATION / 100));
+      if (progressPercent >= 100) {
+        progressPercent = 0;
+        nextSlide();
+      }
+      const pBar = document.getElementById('progress-bar');
+      if (pBar) pBar.style.width = Math.min(progressPercent, 100) + '%';
+    }, 100);
+
+    // Keyboard navigation
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowLeft' || e.key === ' ') {
+        nextSlide();
+      } else if (e.key === 'ArrowRight') {
+        prevSlide();
+      }
+    });
+  </script>
+</body>
+</html>
