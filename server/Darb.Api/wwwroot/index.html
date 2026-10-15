@@ -746,6 +746,8 @@
       if (container.children.length > 20) {
         container.removeChild(container.lastChild);
       }
+    }
+
     // Action: Trigger TomTom Traffic Harvest into local PostGIS database
     async function triggerTrafficHarvest() {
       addFeedItem('🛰️ جارٍ مزامنة حركة مرور بغداد عبر TomTom إلى قاعدة البيانات...', 'Harvesting Baghdad traffic flow from TomTom...');
