@@ -48,8 +48,9 @@ class AppController extends ChangeNotifier {
   Timer? _simulation;
   Timer? _expiry;
   Timer? _serverIncidentsTimer;
-  static const int localAppVersionCode = 4;
-  static const String localAppVersionName = '1.0.4';
+  Timer? _updateCheckTimer;
+  static const int localAppVersionCode = 6;
+  static const String localAppVersionName = '1.0.6';
   Map<String, dynamic>? updateAvailableInfo;
   RoadReport? pendingPromptReport;
   final Set<String> _promptedIncidentIds = {};
@@ -221,6 +222,9 @@ class AppController extends ChangeNotifier {
     });
     _serverIncidentsTimer = Timer.periodic(const Duration(seconds: 15), (_) {
       unawaited(fetchServerIncidents());
+    });
+    _updateCheckTimer = Timer.periodic(const Duration(minutes: 2), (_) {
+      unawaited(checkForUpdates());
     });
     unawaited(fetchServerIncidents());
     unawaited(checkForUpdates());
@@ -1147,6 +1151,7 @@ class AppController extends ChangeNotifier {
   void dispose() {
     _disposed = true; _routeRequest++; _searchRequest++;
     _serverIncidentsTimer?.cancel();
+    _updateCheckTimer?.cancel();
     _simulation?.cancel(); _expiry?.cancel(); _gps?.cancel(); _reportStream?.cancel();
     _tts?.stop(); _community.dispose(); _routing.dispose(); _search.dispose();
     _api.dispose();

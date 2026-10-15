@@ -138,13 +138,13 @@ app.MapGet("/api/auth/verify", (HttpContext ctx) =>
 // App version & update info endpoint (100% Public)
 app.MapGet("/api/app/version", () => Results.Ok(new
 {
-    versionCode = 5,
-    versionName = "1.0.5",
+    versionCode = 6,
+    versionName = "1.0.6",
     apkUrl = "http://139.185.47.123:5000/darb.apk",
     apkSizeBytes = 86608488,
     publishedAt = DateTime.UtcNow,
-    releaseNotesAr = "عرض القمر الصناعي ثلاثي الأبعاد مدمج مع المباني ثلاثية الأبعاد (3D Buildings) وعرض خطوط حركة المرور الحية في لوحة التحكم والتطبيق",
-    releaseNotesEn = "Combined 3D Satellite view with extruded 3D buildings and live traffic flow lines on dashboard and app"
+    releaseNotesAr = "تثبيت مؤشر الموقع على الخريطة أثناء التحريك، وإزالة خطوط الطرق الزائدة لتجربة تصفح نظيفة وسلسة",
+    releaseNotesEn = "Fixed cursor location sticking to map during finger pan, cleaned up road lines for smooth navigation"
 }))
 .WithName("GetAppVersion");
 
