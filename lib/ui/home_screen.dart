@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:maplibre_gl/maplibre_gl.dart';
 import 'package:latlong2/latlong.dart' as ll;
 
+import 'package:url_launcher/url_launcher.dart';
+
 import '../app/app_controller.dart';
 import '../domain/models.dart';
 import '../domain/traffic_engine.dart';
@@ -778,6 +780,189 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             ),
           ],
 
+          // APK Update Available Banner
+          if (c.updateAvailableInfo != null)
+            Positioned(
+              top: c.navigating ? 210 : 54,
+              left: 16,
+              right: 16,
+              child: Material(
+                elevation: 10,
+                borderRadius: BorderRadius.circular(18),
+                color: const Color(0xFF0F172A),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: const Color(0xFF00D2FF), width: 1.5),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF00D2FF).withOpacity(0.2),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.system_update_rounded, color: Color(0xFF00D2FF), size: 24),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              arabic ? '🚀 تحديث جديد متوفر لدرب' : '🚀 New Darb Update Available',
+                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              arabic
+                                  ? (c.updateAvailableInfo!['releaseNotesAr'] ?? 'انقر لتحميل النسخة الأحدث الآن')
+                                  : (c.updateAvailableInfo!['releaseNotesEn'] ?? 'Tap to download the latest APK'),
+                              style: const TextStyle(color: Colors.white70, fontSize: 11),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      FilledButton(
+                        style: FilledButton.styleFrom(
+                          backgroundColor: const Color(0xFF00D2FF),
+                          foregroundColor: const Color(0xFF0A0E14),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          minimumSize: const Size(0, 32),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        onPressed: () {
+                          final apkUrl = c.updateAvailableInfo!['apkUrl']?.toString() ?? 'http://139.185.47.123:5000/darb.apk';
+                          launchUrl(Uri.parse(apkUrl), mode: LaunchMode.externalApplication);
+                        },
+                        child: Text(
+                          arabic ? 'تحديث' : 'Update',
+                          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 11),
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close, color: Colors.white54, size: 18),
+                        onPressed: () => c.dismissUpdate(),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+
+          // Waze-style "Still there?" Speed bump confirmation banner
+          if (c.pendingPromptReport != null)
+            Positioned(
+              bottom: c.navigating ? 140 : 220,
+              left: 16,
+              right: 16,
+              child: Material(
+                elevation: 12,
+                borderRadius: BorderRadius.circular(22),
+                color: dark ? const Color(0xFF161F2E) : Colors.white,
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(22),
+                    border: Border.all(color: const Color(0xFFFFB300), width: 2),
+                    boxShadow: const [
+                      BoxShadow(color: Colors.black38, blurRadius: 16, offset: Offset(0, 4)),
+                    ],
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: const BoxDecoration(
+                              color: Color(0xFFFFB300),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.warning_amber_rounded, color: Colors.black87, size: 24),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  arabic ? '🛑 هل المطب الاصطناعي لا يزال موجوداً؟' : '🛑 Is this speed bump still there?',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w800,
+                                    color: dark ? Colors.white : Colors.black87,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  arabic
+                                      ? 'تأكيدك يحافظ على بقاء التنبيه للسائقين الآخرين'
+                                      : 'Confirming keeps the alert active for other drivers',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: dark ? Colors.white60 : Colors.black54,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          IconButton(
+                            icon: Icon(Icons.close, color: dark ? Colors.white54 : Colors.black45, size: 18),
+                            onPressed: () => c.dismissPromptReport(),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: () => c.rejectPromptReport(),
+                              icon: const Icon(Icons.close, size: 16, color: Colors.redAccent),
+                              label: Text(
+                                arabic ? 'غير موجود' : 'Not there',
+                                style: const TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 12),
+                              ),
+                              style: OutlinedButton.styleFrom(
+                                side: const BorderSide(color: Colors.redAccent),
+                                padding: const EdgeInsets.symmetric(vertical: 10),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: FilledButton.icon(
+                              onPressed: () => c.confirmPromptReport(),
+                              icon: const Icon(Icons.thumb_up_alt_rounded, size: 16),
+                              label: Text(
+                                arabic ? 'نعم، لا يزال موجوداً' : 'Yes, still there',
+                                style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12),
+                              ),
+                              style: FilledButton.styleFrom(
+                                backgroundColor: const Color(0xFF00C8F8),
+                                foregroundColor: Colors.black,
+                                padding: const EdgeInsets.symmetric(vertical: 10),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+
           // Parking Arrival Prompt Banner
           if (c.showParkingPrompt)
             Positioned(
@@ -840,16 +1025,19 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       : Icons.volume_off_rounded,
                   color: c.voice ? WazeColors.blue : Colors.grey,
                   dark: dark,
+                  tooltip: arabic ? 'نقر: تبديل الصوت • مطول: اختبار الصوت' : 'Tap: Toggle voice • Long press: Test voice',
                   onPressed: () {
                     if (!c.voice) {
                       c.setVoice(true);
                       c.setLessChatty(false);
+                      c.testVoice();
                     } else if (!c.lessChatty) {
                       c.setLessChatty(true);
                     } else {
                       c.setVoice(false);
                     }
                   },
+                  onLongPress: () => c.testVoice(),
                 ),
                 const SizedBox(height: 10),
 
@@ -1068,6 +1256,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     required Color color,
     required bool dark,
     required VoidCallback onPressed,
+    VoidCallback? onLongPress,
+    String? tooltip,
   }) {
     return Container(
       width: 44,
@@ -1079,9 +1269,16 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           BoxShadow(color: Colors.black26, blurRadius: 6, offset: Offset(0, 2)),
         ],
       ),
-      child: IconButton(
-        icon: Icon(icon, color: color, size: 22),
-        onPressed: onPressed,
+      child: Tooltip(
+        message: tooltip ?? '',
+        child: InkWell(
+          borderRadius: BorderRadius.circular(22),
+          onTap: onPressed,
+          onLongPress: onLongPress,
+          child: Center(
+            child: Icon(icon, color: color, size: 22),
+          ),
+        ),
       ),
     );
   }

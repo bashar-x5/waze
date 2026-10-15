@@ -47,6 +47,10 @@ class AppController extends ChangeNotifier {
   Timer? _simulation;
   Timer? _expiry;
   Timer? _serverIncidentsTimer;
+  static const int localAppVersionCode = 2;
+  Map<String, dynamic>? updateAvailableInfo;
+  RoadReport? pendingPromptReport;
+  final Set<String> _promptedIncidentIds = {};
 
   String get userId => _sessionId;
   String? get deviceModel => _deviceModel;
@@ -215,6 +219,7 @@ class AppController extends ChangeNotifier {
       unawaited(fetchServerIncidents());
     });
     unawaited(fetchServerIncidents());
+    unawaited(checkForUpdates());
     unawaited(locate());
   }
 
@@ -693,6 +698,11 @@ class AppController extends ChangeNotifier {
             warningMsg = arabic
                 ? 'انتبه: مطب اصطناعي بعد ${(metersAway).round()} متر'
                 : 'Caution: Speed bump ahead in ${(metersAway).round()} meters';
+
+            // Ask driver if bump is still there
+            if (pendingPromptReport == null && !_promptedIncidentIds.contains(rep.id)) {
+              pendingPromptReport = rep;
+            }
           } else if (rep.type == ReportType.camera) {
             warningMsg = arabic
                 ? 'انتبه: رادار مراقبة سرعة أمامك'
@@ -713,6 +723,66 @@ class AppController extends ChangeNotifier {
     }
   }
 
+  Future<void> checkForUpdates() async {
+    try {
+      final info = await _api.checkAppVersion();
+      if (info != null) {
+        final serverCode = (info['versionCode'] as num?)?.toInt() ?? 0;
+        if (serverCode > localAppVersionCode) {
+          updateAvailableInfo = info;
+          _emit();
+        }
+      }
+    } catch (_) {}
+  }
+
+  void dismissUpdate() {
+    updateAvailableInfo = null;
+    _emit();
+  }
+
+  void dismissPromptReport() {
+    if (pendingPromptReport != null) {
+      _promptedIncidentIds.add(pendingPromptReport!.id);
+    }
+    pendingPromptReport = null;
+    _emit();
+  }
+
+  Future<void> confirmPromptReport() async {
+    if (pendingPromptReport == null) return;
+    final rep = pendingPromptReport!;
+    _promptedIncidentIds.add(rep.id);
+    pendingPromptReport = null;
+    await confirmReport(rep);
+    notice = arabic
+        ? 'شكراً لك! تم تأكيد المطب وبقاؤه على الخريطة.'
+        : 'Thank you! Speed bump confirmed and will stay active.';
+    _emit();
+  }
+
+  Future<void> rejectPromptReport() async {
+    if (pendingPromptReport == null) return;
+    final rep = pendingPromptReport!;
+    _promptedIncidentIds.add(rep.id);
+    pendingPromptReport = null;
+    unawaited(_api.rejectIncident(rep.id, userId: _sessionId));
+    notice = arabic
+        ? 'شكراً لك على تحديث حالة الطريق.'
+        : 'Thank you for updating road conditions.';
+    _emit();
+  }
+
+  Future<void> testVoice() async {
+    voice = true;
+    final testMsg = arabic
+        ? 'مرحباً بك في درب، نظام التوجيه الصوتي يعمل بنجاح.'
+        : 'Welcome to Darb, voice guidance is working successfully.';
+    await _speak(testMsg, force: true);
+    notice = arabic ? '🔊 تم تشغيل الصوت التجريبي' : '🔊 Playing test voice';
+    _emit();
+  }
+
   Future<void> _speak(String text, {bool force = false}) async {
     if (!voice || !enableDeviceServices || text.trim().isEmpty) return;
     final now = DateTime.now();
@@ -728,8 +798,29 @@ class AppController extends ChangeNotifier {
 
     try {
       _tts ??= FlutterTts();
-      await _tts!.setLanguage(arabic ? 'ar' : 'en-US');
-      await _tts!.setSpeechRate(0.48);
+      await _tts!.setVolume(1.0);
+      await _tts!.setSpeechRate(0.5);
+      await _tts!.setPitch(1.0);
+
+      if (arabic) {
+        var langSet = false;
+        for (final lang in const ['ar-SA', 'ar', 'ar-EG', 'ar-XA']) {
+          try {
+            final avail = await _tts!.isLanguageAvailable(lang);
+            if (avail == 1 || avail == true) {
+              await _tts!.setLanguage(lang);
+              langSet = true;
+              break;
+            }
+          } catch (_) {}
+        }
+        if (!langSet) {
+          try { await _tts!.setLanguage('ar'); } catch (_) {}
+        }
+      } else {
+        await _tts!.setLanguage('en-US');
+      }
+
       await _tts!.speak(text);
     } catch (_) {
       notice = tr('Voice is unavailable on this device; visual directions remain available.',

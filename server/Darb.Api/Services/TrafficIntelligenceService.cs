@@ -10,6 +10,7 @@ public interface ITrafficIntelligenceService
     Task<List<TrafficConditionDto>> GetConditionsAsync(double? minLon, double? minLat, double? maxLon, double? maxLat, CancellationToken cancellationToken = default);
     Task<TrafficIncidentDto> ReportIncidentAsync(TrafficIncidentDto dto, CancellationToken cancellationToken = default);
     Task<bool> ConfirmIncidentAsync(string incidentId, string? userId = null, CancellationToken cancellationToken = default);
+    Task<bool> RejectIncidentAsync(string incidentId, string? userId = null, CancellationToken cancellationToken = default);
     Task<List<TrafficIncidentDto>> GetIncidentsAsync(double? minLon, double? minLat, double? maxLon, double? maxLat, CancellationToken cancellationToken = default);
     Task AggregateTrafficAsync(CancellationToken cancellationToken = default);
     Task<List<DarbUserDto>> GetUsersAsync(CancellationToken cancellationToken = default);
@@ -296,9 +297,15 @@ public class TrafficIntelligenceService : ITrafficIntelligenceService
     public async Task<bool> ConfirmIncidentAsync(string incidentId, string? userId = null, CancellationToken cancellationToken = default)
     {
         var incident = await _db.TrafficIncidents.FindAsync([incidentId], cancellationToken);
-        if (incident == null || incident.ExpiresAt < DateTime.UtcNow) return false;
+        if (incident == null) return false;
 
         var now = DateTime.UtcNow;
+        var isBump = incident.Type == "bump" || incident.IsRoadWarning;
+
+        // Non-bump incidents expire strictly at ExpiresAt.
+        // Verified bumps and speed bumps have a 7-day grace period past expiration where approaching drivers can confirm them and keep them active.
+        if (!isBump && incident.ExpiresAt < now) return false;
+        if (isBump && incident.ExpiresAt < now.AddDays(-7)) return false;
 
         if (!string.IsNullOrEmpty(userId))
         {
@@ -332,7 +339,7 @@ public class TrafficIntelligenceService : ITrafficIntelligenceService
         incident.LastConfirmedAt = now;
 
         // Check if 3 users rule reached for bumps or general incidents
-        if (incident.Type == "bump")
+        if (isBump)
         {
             var totalUniqueUsers = await _db.IncidentConfirmations
                 .Where(c => c.IncidentId == incidentId)
@@ -342,19 +349,19 @@ public class TrafficIntelligenceService : ITrafficIntelligenceService
 
             if (!string.IsNullOrEmpty(incident.UserId)) totalUniqueUsers++;
 
-            if (totalUniqueUsers >= 3 || incident.Confirmations >= 3)
+            if (totalUniqueUsers >= 3 || incident.Confirmations >= 3 || incident.IsRoadWarning)
             {
                 incident.IsVerified = true;
                 incident.IsRoadWarning = true;
-                incident.ExpiresAt = now.AddDays(90);
+                incident.ExpiresAt = now.AddDays(90); // If confirmed by drivers, stay active for 90 days!
                 if (string.IsNullOrWhiteSpace(incident.Description) || !incident.Description.Contains("مطب"))
                 {
-                    incident.Description = "⚠️ مطب اصطناعي معتمد (تأكيد 3 سائقين) | Verified Speed Bump";
+                    incident.Description = "⚠️ مطب اصطناعي معتمد (تأكيد سائقين) | Verified Speed Bump";
                 }
             }
             else
             {
-                incident.ExpiresAt = now.AddHours(2);
+                incident.ExpiresAt = now.AddHours(24);
             }
         }
         else
@@ -370,12 +377,26 @@ public class TrafficIntelligenceService : ITrafficIntelligenceService
         return true;
     }
 
+    public async Task<bool> RejectIncidentAsync(string incidentId, string? userId = null, CancellationToken cancellationToken = default)
+    {
+        var incident = await _db.TrafficIncidents.FindAsync([incidentId], cancellationToken);
+        if (incident == null) return false;
+
+        incident.Confirmations = Math.Max(0, incident.Confirmations - 1);
+        if (incident.Confirmations <= 0 && !incident.IsRoadWarning)
+        {
+            incident.ExpiresAt = DateTime.UtcNow.AddMinutes(-1);
+        }
+        await _db.SaveChangesAsync(cancellationToken);
+        return true;
+    }
+
     public async Task<List<TrafficIncidentDto>> GetIncidentsAsync(double? minLon, double? minLat, double? maxLon, double? maxLat, CancellationToken cancellationToken = default)
     {
         var now = DateTime.UtcNow;
         var query = _db.TrafficIncidents
             .AsNoTracking()
-            .Where(i => i.ExpiresAt > now);
+            .Where(i => i.ExpiresAt > now || ((i.IsRoadWarning || i.Type == "bump") && i.ExpiresAt > now.AddDays(-7)));
 
         if (minLat.HasValue && maxLat.HasValue && minLon.HasValue && maxLon.HasValue)
         {

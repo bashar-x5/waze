@@ -310,6 +310,29 @@
       color: #FFF;
     }
 
+    .user-filter-btn {
+      padding: 5px 10px;
+      border-radius: 8px;
+      border: 1px solid var(--border-color);
+      background: var(--bg-card);
+      color: var(--text-muted);
+      font-family: var(--font);
+      font-size: 10px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .user-filter-btn:hover {
+      border-color: var(--primary);
+      color: var(--text);
+    }
+    .user-filter-btn.active {
+      background: rgba(0, 210, 255, 0.15);
+      border-color: var(--primary);
+      color: var(--primary);
+      box-shadow: 0 0 8px rgba(0, 210, 255, 0.2);
+    }
+
     /* Main Dashboard Grid */
     main {
       flex: 1;
@@ -615,6 +638,53 @@
 </head>
 <body>
 
+  <!-- Dark Glassmorphic Login Overlay -->
+  <div id="login-overlay" style="display: none; position: fixed; inset: 0; z-index: 9999; background: rgba(5, 8, 13, 0.88); backdrop-filter: blur(20px); align-items: center; justify-content: center; padding: 20px;">
+    <div style="background: linear-gradient(145deg, #101722, #0d141e); border: 1px solid rgba(0, 210, 255, 0.3); box-shadow: 0 12px 48px rgba(0, 0, 0, 0.8), 0 0 32px rgba(0, 210, 255, 0.15); border-radius: 20px; width: 100%; max-width: 440px; padding: 32px 28px; text-align: center;">
+      
+      <div style="width: 58px; height: 58px; background: linear-gradient(135deg, #005C8A, #00D2FF); border-radius: 16px; margin: 0 auto 16px; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 24px rgba(0, 210, 255, 0.4);">
+        <svg style="width: 32px; height: 32px; fill: white;" viewBox="0 0 24 24"><path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"/></svg>
+      </div>
+
+      <h2 style="font-size: 22px; font-weight: 900; margin-bottom: 6px; background: linear-gradient(90deg, #FFFFFF, #00D2FF); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
+        درب — لوحة التحكم والعمليات
+      </h2>
+      <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 22px;">
+        يرجى إدخال بيانات المشرف للوصول إلى لوحة العمليات والتحكم بالأجهزة
+      </p>
+
+      <!-- Public APK Download Card (Zero restrictions) -->
+      <div style="background: rgba(0, 210, 255, 0.08); border: 1px dashed rgba(0, 210, 255, 0.3); border-radius: 12px; padding: 12px; margin-bottom: 22px; display: flex; align-items: center; justify-content: space-between; gap: 12px; text-align: right;">
+        <div>
+          <div style="font-size: 12px; font-weight: 800; color: #FFF;">📲 هل تبحث عن تحميل التطبيق؟</div>
+          <div style="font-size: 10px; color: var(--text-muted);">تحميل APK مباشر ومجاني بدون تسجيل دخول</div>
+        </div>
+        <a href="/darb.apk" style="background: linear-gradient(135deg, #007DAF, var(--primary)); color: #000; text-decoration: none; padding: 8px 12px; border-radius: 8px; font-weight: 800; font-size: 11px; white-space: nowrap; display: inline-flex; align-items: center; gap: 5px;">
+          <span>⬇️</span> تحميل APK
+        </a>
+      </div>
+
+      <!-- Login Form -->
+      <form id="login-form" onsubmit="handleLoginSubmit(event)" style="display: flex; flex-direction: column; gap: 14px; text-align: right;">
+        <div>
+          <label style="display: block; font-size: 11px; font-weight: 700; color: var(--text-muted); margin-bottom: 6px;">اسم المستخدم (Username)</label>
+          <input type="text" id="login-username" required autocomplete="username" placeholder="admin" style="width: 100%; padding: 10px 14px; background: rgba(0,0,0,0.4); border: 1px solid var(--border-color); border-radius: 10px; color: #FFF; font-family: var(--font); font-size: 13px; outline: none; transition: border-color 0.2s;" onfocus="this.style.borderColor='var(--primary)'" onblur="this.style.borderColor='var(--border-color)'">
+        </div>
+
+        <div>
+          <label style="display: block; font-size: 11px; font-weight: 700; color: var(--text-muted); margin-bottom: 6px;">كلمة المرور (Password)</label>
+          <input type="password" id="login-password" required autocomplete="current-password" placeholder="••••••••" style="width: 100%; padding: 10px 14px; background: rgba(0,0,0,0.4); border: 1px solid var(--border-color); border-radius: 10px; color: #FFF; font-family: var(--font); font-size: 13px; outline: none; transition: border-color 0.2s;" onfocus="this.style.borderColor='var(--primary)'" onblur="this.style.borderColor='var(--border-color)'">
+        </div>
+
+        <div id="login-error" style="display: none; padding: 8px 12px; background: rgba(255, 61, 0, 0.15); border: 1px solid rgba(255, 61, 0, 0.4); border-radius: 8px; color: #FF8A80; font-size: 11px; font-weight: 700; text-align: center;"></div>
+
+        <button type="submit" id="login-btn-submit" style="margin-top: 6px; width: 100%; padding: 12px; background: linear-gradient(135deg, #007DAF, var(--primary)); border: none; border-radius: 10px; color: #000; font-family: var(--font); font-weight: 800; font-size: 13px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 0 16px rgba(0, 210, 255, 0.3);">
+          <span>🔐</span> <span>تسجيل الدخول إلى لوحة التحكم</span>
+        </button>
+      </form>
+    </div>
+  </div>
+
   <!-- Top Header -->
   <header>
     <div class="brand">
@@ -644,6 +714,10 @@
       <button class="btn btn-primary" onclick="fetchLiveStats(true)">
         <span>🔄</span>
         <span id="btn-refresh-top">تحديث البيانات الحية</span>
+      </button>
+      <button class="btn" id="btn-logout" onclick="logout()" style="border-color: rgba(255, 61, 0, 0.4); color: #FF8A80; display: none;">
+        <span>🚪</span>
+        <span id="btn-logout-text">خروج</span>
       </button>
     </div>
   </header>
@@ -761,6 +835,16 @@
           <div class="panel-header">
             <h2><span>👥</span> <span id="lbl-panel-users">الأجهزة والمستخدمون المسجلون</span></h2>
             <button class="btn-sm" onclick="fetchDashboardUsers()"><span>🔄</span> تحديث</button>
+          </div>
+          <!-- User Search & Filter Toolbar -->
+          <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+            <input type="text" id="user-search-input" oninput="filterUsersList()" placeholder="🔍 بحث عن جهاز، موديل، أو معرف..." style="flex: 1; padding: 7px 12px; background: rgba(0,0,0,0.3); border: 1px solid var(--border-color); border-radius: 8px; color: var(--text); font-family: var(--font); font-size: 11px; outline: none;">
+          </div>
+          <div style="display: flex; gap: 4px; margin-bottom: 12px; flex-wrap: wrap;">
+            <button class="user-filter-btn active" id="filter-btn-all" onclick="setUserFilter('all')">الكل (<span id="count-all">0</span>)</button>
+            <button class="user-filter-btn" id="filter-btn-active" onclick="setUserFilter('active')">نشط (<span id="count-active">0</span>)</button>
+            <button class="user-filter-btn" id="filter-btn-trusted" onclick="setUserFilter('trusted')">موثوق (<span id="count-trusted">0</span>)</button>
+            <button class="user-filter-btn" id="filter-btn-blocked" onclick="setUserFilter('blocked')">محظور (<span id="count-blocked">0</span>)</button>
           </div>
           <div class="feed-list" id="users-container" style="max-height: 480px;">
             <div style="font-size: 11px; color: var(--text-muted); text-align: center; padding: 20px;">
@@ -987,10 +1071,118 @@
       markersLayer = L.layerGroup().addTo(map);
     }
 
+    // Authentication State & Headers
+    const AUTH_KEY = 'darb_admin_token';
+
+    function getAuthToken() {
+      return localStorage.getItem(AUTH_KEY);
+    }
+
+    function setAuthToken(token) {
+      localStorage.setItem(AUTH_KEY, token);
+    }
+
+    function clearAuthToken() {
+      localStorage.removeItem(AUTH_KEY);
+    }
+
+    function getAuthHeaders() {
+      const headers = { 'Content-Type': 'application/json' };
+      const token = getAuthToken();
+      if (token) {
+        headers['Authorization'] = 'Bearer ' + token;
+      }
+      return headers;
+    }
+
+    async function verifyAuth() {
+      const token = getAuthToken();
+      if (!token) {
+        showLoginModal();
+        return false;
+      }
+      try {
+        const res = await fetch('/api/auth/verify', {
+          headers: { 'Authorization': 'Bearer ' + token }
+        });
+        if (res.ok) {
+          hideLoginModal();
+          return true;
+        }
+      } catch (e) {}
+      clearAuthToken();
+      showLoginModal();
+      return false;
+    }
+
+    function showLoginModal() {
+      const overlay = document.getElementById('login-overlay');
+      if (overlay) overlay.style.display = 'flex';
+      const logoutBtn = document.getElementById('btn-logout');
+      if (logoutBtn) logoutBtn.style.display = 'none';
+    }
+
+    function hideLoginModal() {
+      const overlay = document.getElementById('login-overlay');
+      if (overlay) overlay.style.display = 'none';
+      const logoutBtn = document.getElementById('btn-logout');
+      if (logoutBtn) logoutBtn.style.display = 'inline-flex';
+    }
+
+    function logout() {
+      clearAuthToken();
+      showLoginModal();
+    }
+
+    async function handleLoginSubmit(e) {
+      e.preventDefault();
+      const username = document.getElementById('login-username').value.trim();
+      const password = document.getElementById('login-password').value;
+      const errBox = document.getElementById('login-error');
+      const btn = document.getElementById('login-btn-submit');
+
+      errBox.style.display = 'none';
+      btn.disabled = true;
+      btn.innerHTML = '<span>⏳</span> ' + (isArabic ? 'جارٍ التحقق...' : 'Verifying...');
+
+      try {
+        const res = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password })
+        });
+
+        const data = await res.json();
+        if (res.ok && data.token) {
+          setAuthToken(data.token);
+          hideLoginModal();
+          fetchLiveStats(true);
+          fetchDashboardUsers();
+        } else {
+          errBox.innerText = data.error || (isArabic ? 'اسم المستخدم أو كلمة المرور غير صحيحة' : 'Invalid credentials');
+          errBox.style.display = 'block';
+        }
+      } catch (err) {
+        errBox.innerText = isArabic ? 'تعذر الاتصال بالخادم' : 'Server connection failed';
+        errBox.style.display = 'block';
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<span>🔐</span> ' + (isArabic ? 'تسجيل الدخول إلى لوحة التحكم' : 'Login to Dashboard');
+      }
+    }
+
     // Live Stats Fetching
     async function fetchLiveStats(manual = false) {
+      const token = getAuthToken();
+      if (!token) return;
       try {
-        const res = await fetch('/api/dashboard/stats');
+        const res = await fetch('/api/dashboard/stats', {
+          headers: getAuthHeaders()
+        });
+        if (res.status === 401) {
+          showLoginModal();
+          return;
+        }
         if (!res.ok) throw new Error('API offline');
         const data = await res.json();
         updateUI(data);
@@ -1010,16 +1202,85 @@
       } catch (e) {}
     }
 
-    // Fetch and render registered device users
+    // Fetch and render registered device users with Search & Filters
+    let allUsersData = [];
+    let currentUserFilter = 'all';
+
     async function fetchDashboardUsers() {
+      const token = getAuthToken();
+      if (!token) return;
       try {
-        const res = await fetch('/api/dashboard/users');
+        const res = await fetch('/api/dashboard/users', {
+          headers: getAuthHeaders()
+        });
+        if (res.status === 401) {
+          showLoginModal();
+          return;
+        }
         if (!res.ok) return;
-        const users = await res.json();
-        renderUsersList(users);
+        allUsersData = await res.json();
+        updateUserFilterCounts();
+        renderFilteredUsers();
       } catch (e) {
         console.warn('Error fetching users:', e);
       }
+    }
+
+    function setUserFilter(filter) {
+      currentUserFilter = filter;
+      ['all', 'active', 'trusted', 'blocked'].forEach(f => {
+        const b = document.getElementById(`filter-btn-${f}`);
+        if (b) {
+          if (f === filter) b.classList.add('active');
+          else b.classList.remove('active');
+        }
+      });
+      renderFilteredUsers();
+    }
+
+    function filterUsersList() {
+      renderFilteredUsers();
+    }
+
+    function updateUserFilterCounts() {
+      const total = allUsersData.length;
+      const blocked = allUsersData.filter(u => u.status === 'blocked').length;
+      const trusted = allUsersData.filter(u => u.status === 'trusted').length;
+      const active = total - blocked;
+
+      const elAll = document.getElementById('count-all');
+      const elAct = document.getElementById('count-active');
+      const elTrs = document.getElementById('count-trusted');
+      const elBlk = document.getElementById('count-blocked');
+
+      if (elAll) elAll.innerText = total;
+      if (elAct) elAct.innerText = active;
+      if (elTrs) elTrs.innerText = trusted;
+      if (elBlk) elBlk.innerText = blocked;
+    }
+
+    function renderFilteredUsers() {
+      const query = (document.getElementById('user-search-input')?.value || '').toLowerCase().trim();
+      let filtered = allUsersData;
+
+      if (currentUserFilter === 'active') {
+        filtered = filtered.filter(u => u.status !== 'blocked');
+      } else if (currentUserFilter === 'trusted') {
+        filtered = filtered.filter(u => u.status === 'trusted');
+      } else if (currentUserFilter === 'blocked') {
+        filtered = filtered.filter(u => u.status === 'blocked');
+      }
+
+      if (query) {
+        filtered = filtered.filter(u => 
+          (u.userId && u.userId.toLowerCase().includes(query)) ||
+          (u.deviceName && u.deviceName.toLowerCase().includes(query)) ||
+          (u.deviceModel && u.deviceModel.toLowerCase().includes(query)) ||
+          (u.osVersion && u.osVersion.toLowerCase().includes(query))
+        );
+      }
+
+      renderUsersList(filtered);
     }
 
     function centerOnUser(lat, lon) {
@@ -1033,7 +1294,7 @@
       if (!container) return;
 
       if (!users || users.length === 0) {
-        container.innerHTML = '<div style="font-size:11px; color:var(--text-muted); text-align:center; padding:20px;">لا توجد أجهزة مسجلة حالياً</div>';
+        container.innerHTML = `<div style="font-size:11px; color:var(--text-muted); text-align:center; padding:20px;">${isArabic ? 'لا توجد أجهزة مطابقة للبحث' : 'No matching devices found'}</div>`;
         return;
       }
 
@@ -1074,10 +1335,13 @@
             </div>
             <div class="action-group">
               <button class="btn-sm ${isBlocked ? 'btn-sm-warning' : 'btn-sm-danger'}" onclick="adminToggleBlock('${u.userId}')">
-                <span>${isBlocked ? '🔓' : '🚫'}</span> ${isBlocked ? (isArabic ? 'فك الحظر' : 'Unblock') : (isArabic ? 'حظر المستخدم' : 'Block User')}
+                <span>${isBlocked ? '🔓' : '🚫'}</span> ${isBlocked ? (isArabic ? 'فك الحظر' : 'Unblock') : (isArabic ? 'حظر' : 'Block')}
               </button>
               <button class="btn-sm btn-sm-trust" onclick="adminToggleTrust('${u.userId}')">
-                <span>${isTrusted ? '⭐' : '🌟'}</span> ${isTrusted ? (isArabic ? 'إلغاء التوثيق' : 'Untrust') : (isArabic ? 'ترقية لموثوق' : 'Trust User')}
+                <span>${isTrusted ? '⭐' : '🌟'}</span> ${isTrusted ? (isArabic ? 'إلغاء التوثيق' : 'Untrust') : (isArabic ? 'ترقية' : 'Trust')}
+              </button>
+              <button class="btn-sm btn-sm-danger" style="background: rgba(255, 61, 0, 0.15);" onclick="adminDeleteUser('${u.userId}')">
+                <span>🗑️</span> ${isArabic ? 'حذف' : 'Delete'}
               </button>
               ${u.lastLatitude && u.lastLongitude ? `
                 <button class="btn-sm" style="border-color: var(--primary); color: var(--primary);" onclick="centerOnUser(${u.lastLatitude}, ${u.lastLongitude})">
@@ -1096,7 +1360,7 @@
       if (!container) return;
 
       if (!incidents || incidents.length === 0) {
-        container.innerHTML = '<div style="font-size:11px; color:var(--text-muted); text-align:center; padding:20px;">لا توجد بلاغات مرورية نشطة حالياً</div>';
+        container.innerHTML = `<div style="font-size:11px; color:var(--text-muted); text-align:center; padding:20px;">${isArabic ? 'لا توجد بلاغات مرورية نشطة حالياً' : 'No active traffic incidents'}</div>`;
         return;
       }
 
@@ -1146,58 +1410,90 @@
     async function adminDeleteIncident(id) {
       if (!confirm(isArabic ? 'هل أنت متأكد من حذف هذا البلاغ نهائياً؟' : 'Are you sure you want to delete this incident?')) return;
       try {
-        const res = await fetch(`/api/traffic/incidents/${id}`, { method: 'DELETE' });
+        const res = await fetch(`/api/traffic/incidents/${id}`, {
+          method: 'DELETE',
+          headers: getAuthHeaders()
+        });
         if (res.ok) {
           addFeedItem(`🗑️ تم حذف البلاغ (${id}) من الخريطة`, `Incident ${id} deleted`);
           fetchLiveStats(true);
         } else {
-          alert('تعذر حذف البلاغ');
+          alert(isArabic ? 'تعذر حذف البلاغ' : 'Failed to delete incident');
         }
       } catch (e) {
-        alert('خطأ في الاتصال بالخادم');
+        alert(isArabic ? 'خطأ في الاتصال بالخادم' : 'Server connection error');
       }
     }
 
     // Admin action: Verify as road warning (speed bump)
     async function adminVerifyWarning(id) {
       try {
-        const res = await fetch(`/api/traffic/incidents/${id}/verify-warning`, { method: 'POST' });
+        const res = await fetch(`/api/traffic/incidents/${id}/verify-warning`, {
+          method: 'POST',
+          headers: getAuthHeaders()
+        });
         if (res.ok) {
           addFeedItem(`⚠️ تم اعتماد البلاغ (${id}) كمطب وتحذير طريق دائم`, `Incident ${id} verified as road warning`);
           fetchLiveStats(true);
         } else {
-          alert('تعذر اعتماد البلاغ');
+          alert(isArabic ? 'تعذر اعتماد البلاغ' : 'Failed to verify road warning');
         }
       } catch (e) {
-        alert('خطأ في الاتصال بالخادم');
+        alert(isArabic ? 'خطأ في الاتصال بالخادم' : 'Server connection error');
       }
     }
 
     // Admin action: Toggle block user
     async function adminToggleBlock(userId) {
       try {
-        const res = await fetch(`/api/dashboard/users/${userId}/toggle-block`, { method: 'POST' });
+        const res = await fetch(`/api/dashboard/users/${userId}/toggle-block`, {
+          method: 'POST',
+          headers: getAuthHeaders()
+        });
         if (res.ok) {
           addFeedItem(`🛡️ تم تغيير حالة حظر الجهاز (${userId})`, `User ${userId} block toggled`);
-          fetchLiveStats(true);
           fetchDashboardUsers();
+          fetchLiveStats(true);
         }
       } catch (e) {
-        alert('خطأ في الاتصال');
+        alert(isArabic ? 'خطأ في الاتصال' : 'Connection error');
       }
     }
 
     // Admin action: Toggle trust user
     async function adminToggleTrust(userId) {
       try {
-        const res = await fetch(`/api/dashboard/users/${userId}/toggle-trust`, { method: 'POST' });
+        const res = await fetch(`/api/dashboard/users/${userId}/toggle-trust`, {
+          method: 'POST',
+          headers: getAuthHeaders()
+        });
         if (res.ok) {
           addFeedItem(`⭐ تم تغيير حالة توثيق الجهاز (${userId})`, `User ${userId} trust toggled`);
-          fetchLiveStats(true);
           fetchDashboardUsers();
+          fetchLiveStats(true);
         }
       } catch (e) {
-        alert('خطأ في الاتصال');
+        alert(isArabic ? 'خطأ في الاتصال' : 'Connection error');
+      }
+    }
+
+    // Admin action: Delete user completely
+    async function adminDeleteUser(userId) {
+      if (!confirm(isArabic ? `هل أنت متأكد من حذف الجهاز (${userId}) نهائياً من قاعدة البيانات؟` : `Are you sure you want to delete device (${userId}) permanently?`)) return;
+      try {
+        const res = await fetch(`/api/dashboard/users/${userId}`, {
+          method: 'DELETE',
+          headers: getAuthHeaders()
+        });
+        if (res.ok) {
+          addFeedItem(`🗑️ تم حذف الجهاز (${userId}) نهائياً`, `Device ${userId} deleted`);
+          fetchDashboardUsers();
+          fetchLiveStats(true);
+        } else {
+          alert(isArabic ? 'تعذر حذف الجهاز' : 'Failed to delete device');
+        }
+      } catch (e) {
+        alert(isArabic ? 'خطأ في الاتصال بالخادم' : 'Server connection error');
       }
     }
 
@@ -1412,7 +1708,10 @@
     async function triggerTrafficHarvest() {
       addFeedItem('🛰️ جارٍ مزامنة حركة مرور بغداد عبر TomTom إلى قاعدة البيانات...', 'Harvesting Baghdad traffic flow from TomTom...');
       try {
-        const res = await fetch('/api/traffic/harvest', { method: 'POST' });
+        const res = await fetch('/api/traffic/harvest', {
+          method: 'POST',
+          headers: getAuthHeaders()
+        });
         if (res.ok) {
           addFeedItem('✅ اكتملت مزامنة شرايين بغداد وحفظها بنجاح في قاعدة بيانات درب', 'Traffic harvested & indexed into PostGIS');
           fetchLiveStats(true);
@@ -1449,7 +1748,6 @@
       document.getElementById('btn-refresh').innerText = isArabic ? 'تحديث البيانات الآن' : 'Refresh Telemetry';
       const topBtn = document.getElementById('btn-refresh-top');
       if (topBtn) topBtn.innerText = isArabic ? 'تحديث البيانات الحية' : 'Refresh Live Data';
-
       // QR Elements bilingual
       const btnQr = document.getElementById('btn-qr-txt');
       if (btnQr) btnQr.innerText = isArabic ? 'رمز QR للتحميل' : 'QR Download';
@@ -1483,6 +1781,15 @@
       if (qwOpen) qwOpen.innerText = isArabic ? 'عرض الرمز' : 'View Code';
       const qwDl = document.getElementById('btn-qr-widget-dl');
       if (qwDl) qwDl.innerText = isArabic ? 'تحميل' : 'Download';
+
+      const logoutBtnText = document.getElementById('btn-logout-text');
+      if (logoutBtnText) logoutBtnText.innerText = isArabic ? 'خروج' : 'Logout';
+      const dlApkBtn = document.getElementById('btn-dl-apk');
+      if (dlApkBtn) dlApkBtn.innerText = isArabic ? 'تحميل APK' : 'Download APK';
+      const searchInp = document.getElementById('user-search-input');
+      if (searchInp) searchInp.placeholder = isArabic ? '🔍 بحث عن جهاز، موديل، أو معرف...' : '🔍 Search device, model, or ID...';
+
+      renderFilteredUsers();
     }
 
     // QR Code Modal & Copying
@@ -1525,10 +1832,18 @@
     }, 1000);
 
     // Initialize & Poll
-    window.onload = () => {
+    window.onload = async () => {
       initMap();
-      fetchLiveStats();
-      setInterval(fetchLiveStats, 4000);
+      const authenticated = await verifyAuth();
+      if (authenticated) {
+        fetchLiveStats();
+        fetchDashboardUsers();
+      }
+      setInterval(() => {
+        if (getAuthToken()) {
+          fetchLiveStats();
+        }
+      }, 4000);
     };
   </script>
 </body>

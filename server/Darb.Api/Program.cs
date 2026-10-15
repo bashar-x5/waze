@@ -82,6 +82,73 @@ using (var scope = app.Services.CreateScope())
 }
 
 // -------------------------------------------------------------
+// AUTHENTICATION & DASHBOARD SECURITY CONFIGURATION
+// -------------------------------------------------------------
+var adminUser = app.Configuration["AdminAuth:Username"] ?? "admin";
+var adminPass = app.Configuration["AdminAuth:Password"] ?? "darb_admin_2026";
+var adminToken = app.Configuration["AdminAuth:Token"] ?? "darb_secret_token_ops_2026_authorized";
+
+bool IsAuthorized(HttpContext context)
+{
+    var authHeader = context.Request.Headers["Authorization"].FirstOrDefault();
+    if (!string.IsNullOrEmpty(authHeader) && authHeader.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+    {
+        var token = authHeader["Bearer ".Length..].Trim();
+        if (token == adminToken) return true;
+    }
+    if (context.Request.Query.TryGetValue("token", out var qToken) && qToken == adminToken)
+    {
+        return true;
+    }
+    return false;
+}
+
+// Admin login endpoint
+app.MapPost("/api/auth/login", async (HttpContext context) =>
+{
+    try
+    {
+        var req = await context.Request.ReadFromJsonAsync<LoginRequest>();
+        if (req != null && req.Username == adminUser && req.Password == adminPass)
+        {
+            return Results.Ok(new
+            {
+                success = true,
+                token = adminToken,
+                username = adminUser,
+                message = "Authenticated successfully."
+            });
+        }
+    }
+    catch { }
+    return Results.Json(new { success = false, error = "اسم المستخدم أو كلمة المرور غير صحيحة" }, statusCode: 401);
+})
+.WithName("AdminLogin");
+
+app.MapGet("/api/auth/verify", (HttpContext ctx) =>
+{
+    if (IsAuthorized(ctx))
+    {
+        return Results.Ok(new { valid = true, username = adminUser });
+    }
+    return Results.Unauthorized();
+})
+.WithName("VerifyAdminAuth");
+
+// App version & update info endpoint (100% Public)
+app.MapGet("/api/app/version", () => Results.Ok(new
+{
+    versionCode = 2,
+    versionName = "1.0.2",
+    apkUrl = "http://139.185.47.123:5000/darb.apk",
+    apkSizeBytes = 86016419,
+    publishedAt = DateTime.UtcNow,
+    releaseNotesAr = "إصلاح التوجيه الصوتي، التحقق الذكي من المطبات، وتحديثات لوحة التحكم",
+    releaseNotesEn = "Voice guidance fix, smart speed bump verification, and dashboard updates"
+}))
+.WithName("GetAppVersion");
+
+// -------------------------------------------------------------
 // ENDPOINTS
 // -------------------------------------------------------------
 
@@ -242,12 +309,30 @@ app.MapPost("/api/traffic/incidents/{id}/confirm", async (
 })
 .WithName("ConfirmIncident");
 
-// Delete traffic incident (Dashboard Admin control)
-app.MapDelete("/api/traffic/incidents/{id}", async (
+// Reject traffic incident / Still there? (Mobile driver vote: Not there / Gone)
+app.MapPost("/api/traffic/incidents/{id}/reject", async (
     [FromRoute] string id,
+    [FromBody] ConfirmIncidentRequest? request,
     ITrafficIntelligenceService trafficService,
     CancellationToken cancellationToken) =>
 {
+    var rejected = await trafficService.RejectIncidentAsync(id, request?.UserId, cancellationToken);
+    if (!rejected)
+    {
+        return Results.NotFound(new { error = $"Incident with ID '{id}' not found." });
+    }
+    return Results.Ok(new { message = "Incident marked as not there." });
+})
+.WithName("RejectIncident");
+
+// Delete traffic incident (Dashboard Admin control)
+app.MapDelete("/api/traffic/incidents/{id}", async (
+    [FromRoute] string id,
+    HttpContext ctx,
+    ITrafficIntelligenceService trafficService,
+    CancellationToken cancellationToken) =>
+{
+    if (!IsAuthorized(ctx)) return Results.Unauthorized();
     var deleted = await trafficService.DeleteIncidentAsync(id, cancellationToken);
     if (!deleted)
     {
@@ -260,9 +345,11 @@ app.MapDelete("/api/traffic/incidents/{id}", async (
 // Verify incident as permanent/long-term road warning (Speed Bump)
 app.MapPost("/api/traffic/incidents/{id}/verify-warning", async (
     [FromRoute] string id,
+    HttpContext ctx,
     ITrafficIntelligenceService trafficService,
     CancellationToken cancellationToken) =>
 {
+    if (!IsAuthorized(ctx)) return Results.Unauthorized();
     var verified = await trafficService.VerifyIncidentAsWarningAsync(id, cancellationToken);
     if (!verified)
     {
@@ -274,9 +361,11 @@ app.MapPost("/api/traffic/incidents/{id}/verify-warning", async (
 
 // User management endpoints (Dashboard Controls)
 app.MapGet("/api/dashboard/users", async (
+    HttpContext ctx,
     ITrafficIntelligenceService trafficService,
     CancellationToken cancellationToken) =>
 {
+    if (!IsAuthorized(ctx)) return Results.Unauthorized();
     var users = await trafficService.GetUsersAsync(cancellationToken);
     return Results.Ok(users);
 })
@@ -284,9 +373,11 @@ app.MapGet("/api/dashboard/users", async (
 
 app.MapPost("/api/dashboard/users/{userId}/toggle-block", async (
     [FromRoute] string userId,
+    HttpContext ctx,
     ITrafficIntelligenceService trafficService,
     CancellationToken cancellationToken) =>
 {
+    if (!IsAuthorized(ctx)) return Results.Unauthorized();
     var success = await trafficService.ToggleUserBlockAsync(userId, cancellationToken);
     return Results.Ok(new { message = "User block status toggled.", success });
 })
@@ -294,13 +385,33 @@ app.MapPost("/api/dashboard/users/{userId}/toggle-block", async (
 
 app.MapPost("/api/dashboard/users/{userId}/toggle-trust", async (
     [FromRoute] string userId,
+    HttpContext ctx,
     ITrafficIntelligenceService trafficService,
     CancellationToken cancellationToken) =>
 {
+    if (!IsAuthorized(ctx)) return Results.Unauthorized();
     var success = await trafficService.ToggleUserTrustAsync(userId, cancellationToken);
     return Results.Ok(new { message = "User trust status toggled.", success });
 })
 .WithName("ToggleUserTrust");
+
+app.MapDelete("/api/dashboard/users/{userId}", async (
+    [FromRoute] string userId,
+    HttpContext ctx,
+    DarbDbContext db,
+    CancellationToken ct) =>
+{
+    if (!IsAuthorized(ctx)) return Results.Unauthorized();
+    var user = await db.Users.FindAsync([userId], ct);
+    if (user != null)
+    {
+        db.Users.Remove(user);
+        await db.SaveChangesAsync(ct);
+        return Results.Ok(new { message = $"User '{userId}' deleted successfully." });
+    }
+    return Results.NotFound(new { error = $"User '{userId}' not found." });
+})
+.WithName("DeleteDashboardUser");
 
 // Retrieve traffic incidents
 app.MapGet("/api/traffic/incidents", async (
@@ -318,9 +429,11 @@ app.MapGet("/api/traffic/incidents", async (
 
 // Harvest live traffic from TomTom into PostGIS database
 app.MapPost("/api/traffic/harvest", async (
+    HttpContext ctx,
     ITomTomTrafficHarvester harvester,
     CancellationToken ct) =>
 {
+    if (!IsAuthorized(ctx)) return Results.Unauthorized();
     await harvester.HarvestBaghdadTrafficAsync(ct);
     return Results.Ok(new { message = "Baghdad traffic harvested successfully from TomTom into local database." });
 })
@@ -385,10 +498,12 @@ app.MapGet("/qr.svg", (IWebHostEnvironment env) =>
 .WithName("GetQrSvg");
 
 app.MapGet("/api/dashboard/stats", async (
+    HttpContext ctx,
     DarbDbContext db,
     IHttpClientFactory httpClientFactory,
     CancellationToken ct) =>
 {
+    if (!IsAuthorized(ctx)) return Results.Unauthorized();
     var now = DateTime.UtcNow;
     var tenMinsAgo = now.AddMinutes(-10);
 

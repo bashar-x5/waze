@@ -197,6 +197,37 @@ class DarbApiService {
     }
   }
 
+  /// Rejects an incident report (driver says 'Not there / Gone').
+  Future<bool> rejectIncident(String incidentId, {String? userId}) async {
+    if (_disposed) return false;
+    final uri = Uri.parse('$_baseUrl/api/traffic/incidents/$incidentId/reject');
+    try {
+      final response = await _client
+          .post(
+            uri,
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({'userId': userId}),
+          )
+          .timeout(const Duration(seconds: 5));
+      return response.statusCode == 200 || response.statusCode == 202;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Checks server for latest released APK version and update notifications.
+  Future<Map<String, dynamic>?> checkAppVersion() async {
+    if (_disposed) return null;
+    final uri = Uri.parse('$_baseUrl/api/app/version');
+    try {
+      final response = await _client.get(uri).timeout(const Duration(seconds: 5));
+      if (response.statusCode == 200) {
+        return jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
+      }
+    } catch (_) {}
+    return null;
+  }
+
   /// Fetches traffic-aware routes from the self-hosted Darb API.
   Future<List<DriveRoute>?> fetchRoutes(
     LatLng origin,
