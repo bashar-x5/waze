@@ -16,6 +16,7 @@ import 'widgets/waze_report_sheet.dart';
 import 'widgets/waze_search_modal.dart';
 import 'widgets/waze_settings_modal.dart';
 import 'widgets/waze_speedometer.dart';
+import 'widgets/waze_voice_search_sheet.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({
@@ -205,6 +206,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         asStop: asStop,
       ),
     );
+  }
+
+  void _openVoiceSearch() {
+    WazeVoiceSearchSheet.show(context, widget.controller);
   }
 
   void _openSettings() {
@@ -1148,6 +1153,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               onTapSearch: () => _openSearch(),
               onTapSettings: _openSettings,
               onTapAddStop: () => _openSearch(asStop: true),
+              onTapVoice: _openVoiceSearch,
             ),
           ),
         ],

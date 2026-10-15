@@ -9,6 +9,7 @@ import 'package:darb/ui/widgets/waze_incident_popup.dart';
 import 'package:darb/ui/widgets/waze_nav_hud.dart';
 import 'package:darb/ui/widgets/waze_report_sheet.dart';
 import 'package:darb/ui/widgets/waze_speedometer.dart';
+import 'package:darb/ui/widgets/waze_voice_search_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -229,6 +230,27 @@ void main() {
       controller.dismissParkingPrompt();
       await tester.pump();
       expect(find.text("You've Arrived!"), findsNothing);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      controller.dispose();
+    });
+
+    testWidgets('Voice Search Sheet displays listening visualizer and title', (tester) async {
+      SharedPreferences.setMockInitialValues({});
+      final controller = AppController(enableDeviceServices: false);
+      await controller.load();
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: WazeVoiceSearchSheet(controller: controller),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.text('Smart Voice Navigation'), findsOneWidget);
+      expect(find.byIcon(Icons.mic_rounded), findsWidgets);
 
       await tester.pumpWidget(const SizedBox.shrink());
       controller.dispose();

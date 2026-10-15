@@ -12,12 +12,14 @@ class WazeBottomPanel extends StatelessWidget {
     required this.onTapSearch,
     required this.onTapSettings,
     required this.onTapAddStop,
+    this.onTapVoice,
   });
 
   final AppController controller;
   final VoidCallback onTapSearch;
   final VoidCallback onTapSettings;
   final VoidCallback onTapAddStop;
+  final VoidCallback? onTapVoice;
 
   @override
   Widget build(BuildContext context) {
@@ -112,6 +114,20 @@ class WazeBottomPanel extends StatelessWidget {
                         ),
                       ),
                     ),
+                    if (onTapVoice != null)
+                      Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 4),
+                        decoration: BoxDecoration(
+                          color: WazeColors.cyan.withOpacity(0.18),
+                          shape: BoxShape.circle,
+                        ),
+                        child: IconButton(
+                          icon: const Icon(Icons.mic_rounded, size: 21),
+                          color: WazeColors.cyan,
+                          tooltip: arabic ? 'الملاحة الصوتية' : 'Voice Search',
+                          onPressed: onTapVoice,
+                        ),
+                      ),
                     IconButton(
                       icon: const Icon(Icons.tune_rounded, size: 20),
                       color: dark ? Colors.white54 : Colors.black45,

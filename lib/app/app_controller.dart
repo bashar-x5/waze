@@ -15,6 +15,7 @@ import '../services/routing_service.dart';
 import '../services/place_search_service.dart';
 import '../services/community_service.dart';
 import '../services/darb_api_service.dart';
+import '../domain/voice_command_parser.dart';
 
 class AppController extends ChangeNotifier {
   AppController({
@@ -47,7 +48,7 @@ class AppController extends ChangeNotifier {
   Timer? _simulation;
   Timer? _expiry;
   Timer? _serverIncidentsTimer;
-  static const int localAppVersionCode = 2;
+  static const int localAppVersionCode = 3;
   Map<String, dynamic>? updateAvailableInfo;
   RoadReport? pendingPromptReport;
   final Set<String> _promptedIncidentIds = {};
@@ -299,6 +300,82 @@ class AppController extends ChangeNotifier {
       error = _message(e);
     } finally {
       if (ticket == _searchRequest && !_disposed) { searching = false; _emit(); }
+    }
+  }
+
+  Future<List<Place>> searchPlacesDirect(String query) async {
+    final clean = query.trim();
+    if (clean.isEmpty) return const [];
+    if (demoMode) {
+      final q = clean.toLowerCase();
+      final localMatches = demoPlaces.where((p) =>
+        '${p.name} ${p.nameAr} ${p.subtitle} ${p.subtitleAr}'.toLowerCase().contains(q)).toList();
+      if (localMatches.isNotEmpty) return localMatches;
+    }
+    try {
+      final results = await _search.search(clean, near: position);
+      if (results.isNotEmpty) return results;
+    } catch (e) {
+      debugPrint('Voice search direct error: $e');
+    }
+    // Fallback to local demo places matching query words
+    final words = clean.toLowerCase().split(RegExp(r'\s+'));
+    return demoPlaces.where((p) {
+      final text = '${p.name} ${p.nameAr} ${p.subtitle} ${p.subtitleAr}'.toLowerCase();
+      return words.any((w) => w.length > 2 && text.contains(w));
+    }).toList();
+  }
+
+  Future<void> executeVoiceCommand(VoiceCommandResult result) async {
+    switch (result.intent) {
+      case VoiceIntentType.cancelNavigation:
+        stopNavigation();
+        clearRoute();
+        _speak(arabic ? 'تم إلغاء الملاحة' : 'Navigation cancelled');
+        break;
+      case VoiceIntentType.muteSound:
+        voice = false;
+        _save();
+        _emit();
+        break;
+      case VoiceIntentType.unmuteSound:
+        voice = true;
+        _save();
+        _emit();
+        _speak(arabic ? 'تم تفعيل التوجيه الصوتي' : 'Voice guidance enabled');
+        break;
+      case VoiceIntentType.reportHazard:
+        if (result.hazardType != null) {
+          final type = _parseHazardType(result.hazardType!);
+          await addReport(type, arabic ? 'بلاغ صوتي مباشر' : 'Voice report');
+          _speak(arabic ? 'تم تسجيل البلاغ بنجاح' : 'Report submitted');
+        }
+        break;
+      case VoiceIntentType.navigate:
+      case VoiceIntentType.unknown:
+        break;
+    }
+  }
+
+  ReportType _parseHazardType(String hazard) {
+    switch (hazard) {
+      case 'crash':
+        return ReportType.crash;
+      case 'bump':
+        return ReportType.bump;
+      case 'police':
+        return ReportType.police;
+      default:
+        return ReportType.hazard;
+    }
+  }
+
+  Future<void> navigateToPlaceFromVoice(Place place) async {
+    final placeName = arabic ? place.nameAr : place.name;
+    _speak(arabic ? 'جارٍ التوجيه إلى $placeName' : 'Navigating to $placeName');
+    await chooseDestination(place);
+    if (routes.isNotEmpty) {
+      await startNavigation();
     }
   }
 

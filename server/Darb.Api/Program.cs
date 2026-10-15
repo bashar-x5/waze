@@ -138,13 +138,13 @@ app.MapGet("/api/auth/verify", (HttpContext ctx) =>
 // App version & update info endpoint (100% Public)
 app.MapGet("/api/app/version", () => Results.Ok(new
 {
-    versionCode = 2,
-    versionName = "1.0.2",
+    versionCode = 3,
+    versionName = "1.0.3",
     apkUrl = "http://139.185.47.123:5000/darb.apk",
-    apkSizeBytes = 86016419,
+    apkSizeBytes = 86423015,
     publishedAt = DateTime.UtcNow,
-    releaseNotesAr = "إصلاح التوجيه الصوتي، التحقق الذكي من المطبات، وتحديثات لوحة التحكم",
-    releaseNotesEn = "Voice guidance fix, smart speed bump verification, and dashboard updates"
+    releaseNotesAr = "إضافة الملاحة والبحث الصوتي الذكي باللغة العربية، والتوجيه التلقائي للمطاعم والأماكن",
+    releaseNotesEn = "Smart Arabic voice navigation, hands-free destination search, and auto-routing"
 }))
 .WithName("GetAppVersion");
 

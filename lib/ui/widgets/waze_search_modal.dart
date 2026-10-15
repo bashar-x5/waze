@@ -3,6 +3,7 @@ import '../../app/app_controller.dart';
 import '../../domain/demo_data.dart';
 import '../../domain/models.dart';
 import '../waze_theme.dart';
+import 'waze_voice_search_sheet.dart';
 
 class WazeSearchModal extends StatefulWidget {
   const WazeSearchModal({
@@ -168,7 +169,14 @@ class _WazeSearchModalState extends State<WazeSearchModal> {
                                 setState(() {});
                               },
                             )
-                          : null,
+                          : IconButton(
+                              icon: const Icon(Icons.mic_rounded, color: WazeColors.cyan, size: 22),
+                              tooltip: arabic ? 'بحث صوتي' : 'Voice Search',
+                              onPressed: () {
+                                Navigator.of(context).pop();
+                                WazeVoiceSearchSheet.show(context, widget.controller);
+                              },
+                            ),
                       hintText: widget.asStop
                           ? (arabic
                               ? 'إضافة محطة توقف في الطريق...'

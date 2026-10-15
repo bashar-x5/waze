@@ -47,6 +47,15 @@ final List<Place> demoPlaces = List<Place>.unmodifiable(const [
     category: PlaceCategory.food,
   ),
   Place(
+    id: 'demo-royal-galaxy',
+    name: 'Royal Galaxy Restaurant',
+    nameAr: 'مطعم رويال كالاكسي',
+    subtitle: 'Al-Mansour, Baghdad',
+    subtitleAr: 'المنصور، شارع 14 رمضان، بغداد',
+    point: LatLng(33.3128, 44.3542),
+    category: PlaceCategory.food,
+  ),
+  Place(
     id: 'demo-fuel',
     name: 'Sample fuel stop',
     nameAr: 'محطة وقود تجريبية',

@@ -15,6 +15,7 @@ dependencies:
   latlong2: ^0.10.1
   geolocator: ^14.1.1
   flutter_tts: ^4.2.5
+  speech_to_text: ^7.0.0
   http: ^1.6.0
   shared_preferences: ^2.5.4
   supabase_flutter: ^2.18.2
