@@ -382,10 +382,29 @@ class AppController extends ChangeNotifier {
         const LocationSettings(accuracy: LocationAccuracy.high, timeLimit: Duration(seconds: 20)));
       if (_disposed || demoMode) return false;
       position = LatLng(fix.latitude, fix.longitude);
-      gpsReady = true;
-      await _gps?.cancel();
-      _gps = Geolocator.getPositionStream(locationSettings:
-        const LocationSettings(accuracy: LocationAccuracy.high, distanceFilter: 5))
+      final LocationSettings locationSettings;
+      if (defaultTargetPlatform == TargetPlatform.android) {
+        locationSettings = AndroidSettings(
+          accuracy: LocationAccuracy.bestForNavigation,
+          distanceFilter: 0,
+          forceLocationManager: false,
+          intervalDuration: const Duration(seconds: 1),
+        );
+      } else if (defaultTargetPlatform == TargetPlatform.iOS ||
+                 defaultTargetPlatform == TargetPlatform.macOS) {
+        locationSettings = AppleSettings(
+          accuracy: LocationAccuracy.bestForNavigation,
+          activityType: ActivityType.automotiveNavigation,
+          distanceFilter: 1,
+          pauseLocationUpdatesAutomatically: false,
+        );
+      } else {
+        locationSettings = const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          distanceFilter: 1,
+        );
+      }
+      _gps = Geolocator.getPositionStream(locationSettings: locationSettings)
         .listen(_onPosition, onError: (Object e) {
           gpsReady = false;
           if (navigating) stopNavigation();
@@ -454,13 +473,17 @@ class AppController extends ChangeNotifier {
     }
     position = LatLng(fix.latitude, fix.longitude);
     speedKph = fix.speed.isFinite && fix.speed >= 0 ? fix.speed * 3.6 : 0;
-    heading = fix.heading.isFinite ? fix.heading : 0;
+    if (fix.heading.isFinite && fix.heading > 0) {
+      if (speedKph >= 2.5 || heading == 0) {
+        heading = fix.heading;
+      }
+    }
     gpsReady = true;
 
-    // Send anonymous GPS observation to self-hosted Darb API (throttled to at most once per 4s)
+    // Send anonymous GPS observation to self-hosted Darb API (throttled to at most once per 2s)
     final now = DateTime.now();
     if (_lastGpsObservationSent == null ||
-        now.difference(_lastGpsObservationSent!).inSeconds >= 4) {
+        now.difference(_lastGpsObservationSent!).inSeconds >= 2) {
       _lastGpsObservationSent = now;
       unawaited(_api.sendObservation(
         point: position,
@@ -499,6 +522,11 @@ class AppController extends ChangeNotifier {
     // Street Map-Matching: only snap vehicle if heading aligns with the road and distance is small
     if (!isHeadingDivergent && p.snappedPoint != null && p.distanceFromRouteMeters <= 25) {
       position = p.snappedPoint!;
+    }
+
+    // Always orient the vehicle cursor and camera forward ahead along the route:
+    if (!isHeadingDivergent && p.segmentBearing != null) {
+      heading = p.segmentBearing!;
     }
 
     if (p.arrived) {

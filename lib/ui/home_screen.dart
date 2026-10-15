@@ -1018,11 +1018,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               ),
             ],
           ),
-          child: Center(
+          child: const Center(
             child: Icon(
-              c.navigating
-                  ? Icons.navigation_rounded
-                  : Icons.directions_car_rounded,
+              Icons.navigation_rounded,
               color: WazeColors.blue,
               size: 24,
             ),
