@@ -172,5 +172,66 @@ void main() {
       await tester.pumpWidget(const SizedBox.shrink());
       controller.dispose();
     });
+
+    testWidgets('Parking slot feature saves spot, displays card, and navigates', (tester) async {
+      SharedPreferences.setMockInitialValues({});
+      final controller = AppController(enableDeviceServices: false);
+      await controller.load();
+
+      expect(controller.parkedLocation, isNull);
+      expect(controller.showParkingPrompt, isFalse);
+
+      controller.saveParkingLocation(point: baghdadCenter, note: 'Near gate 3');
+      expect(controller.parkedLocation, isNotNull);
+      expect(controller.parkedLocation!.point, baghdadCenter);
+      expect(controller.parkedLocation!.note, 'Near gate 3');
+
+      await tester.pumpWidget(
+        DarbApp(
+          controller: controller,
+          renderMapTiles: false,
+        ),
+      );
+      await tester.pump();
+
+      expect(find.text('My Parked Car'), findsOneWidget);
+      expect(find.text('Near gate 3'), findsOneWidget);
+
+      await controller.navigateToParkedCar();
+      expect(controller.destination, isNotNull);
+      expect(controller.destination!.category, PlaceCategory.parking);
+      expect(controller.destination!.point, baghdadCenter);
+
+      controller.clearParkingLocation();
+      expect(controller.parkedLocation, isNull);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      controller.dispose();
+    });
+
+    testWidgets('Arrival triggers parking prompt banner and can be dismissed', (tester) async {
+      SharedPreferences.setMockInitialValues({});
+      final controller = AppController(enableDeviceServices: false);
+      await controller.load();
+
+      controller.showParkingPrompt = true;
+
+      await tester.pumpWidget(
+        DarbApp(
+          controller: controller,
+          renderMapTiles: false,
+        ),
+      );
+      await tester.pump();
+
+      expect(find.text("You've Arrived!"), findsOneWidget);
+
+      controller.dismissParkingPrompt();
+      await tester.pump();
+      expect(find.text("You've Arrived!"), findsNothing);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      controller.dispose();
+    });
   });
 }

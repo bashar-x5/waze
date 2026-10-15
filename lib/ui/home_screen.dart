@@ -411,6 +411,21 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
     try {
       await controller.clearLines();
+      await controller.clearCircles();
+
+      // Render saved parked car indicator on map
+      if (c.parkedLocation != null) {
+        await controller.addCircle(
+          CircleOptions(
+            geometry: _toMapLibre(c.parkedLocation!.point),
+            circleColor: '#00C8F8',
+            circleRadius: 10.0,
+            circleStrokeColor: '#FFFFFF',
+            circleStrokeWidth: 3.0,
+            circleOpacity: 0.95,
+          ),
+        );
+      }
 
       if (c.routes.isEmpty) return;
 
@@ -730,6 +745,15 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             ),
           ],
 
+          // Parking Arrival Prompt Banner
+          if (c.showParkingPrompt)
+            Positioned(
+              top: c.navigating ? 156 : 54,
+              left: 16,
+              right: 16,
+              child: _buildParkingPromptCard(context, c, dark, arabic),
+            ),
+
           // Notification / Error banners
           if (c.error != null || c.notice != null)
             Positioned(
@@ -1027,6 +1051,107 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       child: IconButton(
         icon: Icon(icon, color: color, size: 22),
         onPressed: onPressed,
+      ),
+    );
+  }
+
+  Widget _buildParkingPromptCard(
+    BuildContext context,
+    AppController c,
+    bool dark,
+    bool arabic,
+  ) {
+    return Material(
+      elevation: 10,
+      borderRadius: BorderRadius.circular(20),
+      color: dark ? const Color(0xFF1E2835) : Colors.white,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: WazeColors.cyan,
+            width: 1.5,
+          ),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: WazeColors.cyan.withValues(alpha: 0.15),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Center(
+                    child: Text('🅿️', style: TextStyle(fontSize: 22)),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        arabic ? 'وصلت إلى وجهتك!' : "You've Arrived!",
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: dark ? Colors.white : Colors.black87,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        arabic
+                            ? 'هل ترغب في حفظ موقع ركن السيارة للرجوع إليها لاحقاً؟'
+                            : 'Would you like to save this parking spot to find your car later?',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: dark ? Colors.white70 : Colors.black54,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close_rounded, size: 20),
+                  color: dark ? Colors.white54 : Colors.black45,
+                  onPressed: () => c.dismissParkingPrompt(),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => c.dismissParkingPrompt(),
+                    style: OutlinedButton.styleFrom(
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    child: Text(arabic ? 'ليس الآن' : 'Not Now'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: FilledButton.icon(
+                    onPressed: () => c.saveParkingLocation(),
+                    icon: const Icon(Icons.bookmark_add_rounded, size: 18),
+                    label: Text(arabic ? 'حفظ الموقف' : 'Save Spot'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: WazeColors.cyan,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

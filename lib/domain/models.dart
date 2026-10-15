@@ -254,3 +254,28 @@ LatLng _pointFromJson(Map<String, dynamic> json) {
   }
   return LatLng(latitude.toDouble(), longitude.toDouble());
 }
+
+class ParkedCarLocation {
+  const ParkedCarLocation({
+    required this.point,
+    required this.savedAt,
+    this.note,
+  });
+
+  final LatLng point;
+  final DateTime savedAt;
+  final String? note;
+
+  Map<String, dynamic> toJson() => {
+    'latitude': point.latitude,
+    'longitude': point.longitude,
+    'savedAt': savedAt.toIso8601String(),
+    'note': note,
+  };
+
+  factory ParkedCarLocation.fromJson(Map<String, dynamic> json) => ParkedCarLocation(
+    point: _pointFromJson(json),
+    savedAt: DateTime.parse((json['savedAt'] ?? json['saved_at']) as String),
+    note: json['note'] as String?,
+  );
+}

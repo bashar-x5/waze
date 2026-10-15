@@ -60,6 +60,8 @@ class AppController extends ChangeNotifier {
   bool navigating = false;
   bool arrived = false;
   bool gpsReady = false;
+  ParkedCarLocation? parkedLocation;
+  bool showParkingPrompt = false;
   String? error;
   String? notice;
   LatLng position = baghdadCenter;
@@ -116,6 +118,13 @@ class AppController extends ChangeNotifier {
             .where((r) => r.isActive).toList();
         homeId = p['homeId'] as String?;
         workId = p['workId'] as String?;
+        if (p['parkedLocation'] != null) {
+          try {
+            parkedLocation = ParkedCarLocation.fromJson(
+              Map<String, dynamic>.from(p['parkedLocation'] as Map),
+            );
+          } catch (_) { /* Skip damaged parking record */ }
+        }
         for (final name in (p['muted'] as List? ?? [])) {
           for (final type in ReportType.values) {
             if (type.name == name) muted.add(type);
@@ -153,6 +162,7 @@ class AppController extends ChangeNotifier {
       'plans': plans.map((p) => p.toJson()).toList(),
       'reports': localReports.where((r) => r.isActive).map((p) => p.toJson()).toList(),
       'muted': muted.map((t) => t.name).toList(),
+      'parkedLocation': parkedLocation?.toJson(),
     });
     _saveQueue = _saveQueue.then((_) async {
       try { await _prefs?.setString('darb.preferences.v1', data); }
@@ -218,6 +228,48 @@ class AppController extends ChangeNotifier {
     recent.removeWhere((p) => p.id == place.id);
     recent.insert(0, place); recent = recent.take(10).toList(); _save();
     await refreshRoutes();
+  }
+
+  void saveParkingLocation({LatLng? point, String? note}) {
+    parkedLocation = ParkedCarLocation(
+      point: point ?? position,
+      savedAt: DateTime.now(),
+      note: (note != null && note.trim().isNotEmpty) ? note.trim() : null,
+    );
+    showParkingPrompt = false;
+    notice = tr('Parking location saved.', 'تم حفظ موقع وقوف السيارة.');
+    _speak(tr('Parking location saved.', 'تم حفظ موقع سيارتك.'));
+    _save();
+    _emit();
+  }
+
+  void clearParkingLocation() {
+    parkedLocation = null;
+    showParkingPrompt = false;
+    notice = tr('Parking location cleared.', 'تم مسح موقع وقوف السيارة.');
+    _save();
+    _emit();
+  }
+
+  void dismissParkingPrompt() {
+    showParkingPrompt = false;
+    _emit();
+  }
+
+  Future<void> navigateToParkedCar() async {
+    if (parkedLocation == null) return;
+    showParkingPrompt = false;
+    final noteText = parkedLocation!.note;
+    final target = Place(
+      id: 'parked_car_${parkedLocation!.savedAt.millisecondsSinceEpoch}',
+      name: 'My Parked Car',
+      nameAr: 'موقع سيارتي',
+      category: PlaceCategory.parking,
+      point: parkedLocation!.point,
+      subtitle: (noteText != null && noteText.isNotEmpty) ? noteText : 'Saved parking spot',
+      subtitleAr: (noteText != null && noteText.isNotEmpty) ? noteText : 'موقع السيارة المحفوظ',
+    );
+    await chooseDestination(target);
   }
 
   Future<void> removeStop() async { stop = null; await refreshRoutes(); }
@@ -355,7 +407,7 @@ class AppController extends ChangeNotifier {
       await refreshRoutes();
       if (route == null || error != null || _disposed) return;
     }
-    navigating = true; arrived = false; _spokenStep = -1; _offRouteSamples = 0;
+    navigating = true; arrived = false; showParkingPrompt = false; _spokenStep = -1; _offRouteSamples = 0;
     progress = null;
     notice = null; // Clean screen for navigation HUD and map view
     if (demoMode) {
@@ -452,6 +504,7 @@ class AppController extends ChangeNotifier {
     if (p.arrived) {
       _simulation?.cancel(); _simulation = null;
       navigating = false; arrived = true; speedKph = 0;
+      showParkingPrompt = true;
       _speak(tr('Alhamdulillah for your safety, you have arrived at your destination.', 'الحمد لله على سلامتك'));
       notice = tr(
         'Alhamdulillah for your safety! You have arrived at your destination.',

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:latlong2/latlong.dart';
 import '../../app/app_controller.dart';
 import '../../domain/models.dart';
 import '../waze_theme.dart';
@@ -190,6 +191,22 @@ class WazeBottomPanel extends StatelessWidget {
                 },
               ),
               _buildQuickPill(
+                icon: Icons.local_parking_rounded,
+                label: c.parkedLocation != null
+                    ? (arabic ? 'سيارتي' : 'Parked')
+                    : (arabic ? 'ركنت هنا' : 'Park Here'),
+                color: WazeColors.cyan,
+                dark: dark,
+                textColor: textColor,
+                onTap: () {
+                  if (c.parkedLocation != null) {
+                    c.navigateToParkedCar();
+                  } else {
+                    c.saveParkingLocation();
+                  }
+                },
+              ),
+              _buildQuickPill(
                 icon: Icons.settings_rounded,
                 label: arabic ? 'الإعدادات' : 'Settings',
                 color: const Color(0xFF78909C),
@@ -199,6 +216,12 @@ class WazeBottomPanel extends StatelessWidget {
               ),
             ],
           ),
+
+          // Saved Parked Car Card
+          if (c.parkedLocation != null) ...[
+            const SizedBox(height: 12),
+            _buildParkedCarCard(context, c, dark, textColor, arabic),
+          ],
 
           // Recent places preview if available
           if (c.recent.isNotEmpty) ...[
@@ -249,6 +272,152 @@ class WazeBottomPanel extends StatelessWidget {
     );
   }
 
+  Widget _buildParkedCarCard(
+    BuildContext context,
+    AppController c,
+    bool dark,
+    Color textColor,
+    bool arabic,
+  ) {
+    final parked = c.parkedLocation!;
+    final meters = const Distance().as(LengthUnit.Meter, c.position, parked.point);
+    final distStr = c.distance(meters.toDouble());
+
+    final elapsed = DateTime.now().difference(parked.savedAt);
+    final String timeStr;
+    if (elapsed.inMinutes < 1) {
+      timeStr = arabic ? 'الآن' : 'Just now';
+    } else if (elapsed.inMinutes < 60) {
+      timeStr = arabic ? 'منذ ${elapsed.inMinutes} د' : '${elapsed.inMinutes}m ago';
+    } else {
+      final hours = elapsed.inHours;
+      final mins = elapsed.inMinutes % 60;
+      timeStr = arabic ? 'منذ $hours س و $mins د' : '${hours}h ${mins}m ago';
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: dark ? const Color(0xFF1E2835) : const Color(0xFFEBF3FA),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: WazeColors.cyan.withValues(alpha: 0.35),
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: WazeColors.cyan,
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: WazeColors.cyan.withValues(alpha: 0.4),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: const Center(
+              child: Text(
+                '🅿️',
+                style: TextStyle(fontSize: 22),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      arabic ? 'موقع سيارتي' : 'My Parked Car',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: textColor,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: WazeColors.cyan.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        timeStr,
+                        style: const TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                          color: WazeColors.cyan,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  arabic ? 'على بُعد $distStr من موقعك' : '$distStr from your location',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: dark ? Colors.white70 : Colors.black54,
+                  ),
+                ),
+                if (parked.note != null && parked.note!.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    parked.note!,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontStyle: FontStyle.italic,
+                      color: dark ? Colors.white60 : Colors.black45,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(width: 6),
+          IconButton(
+            icon: const Icon(Icons.delete_outline_rounded, size: 20),
+            color: dark ? Colors.white54 : Colors.black45,
+            tooltip: arabic ? 'مسح الموقع' : 'Clear',
+            onPressed: () => c.clearParkingLocation(),
+          ),
+          ElevatedButton.icon(
+            icon: const Icon(Icons.directions_walk_rounded, size: 16),
+            label: Text(arabic ? 'انطلق' : 'Go'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: WazeColors.cyan,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              minimumSize: const Size(0, 36),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+              elevation: 2,
+            ),
+            onPressed: () => c.navigateToParkedCar(),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildQuickPill({
     required IconData icon,
     required String label,
@@ -261,7 +430,7 @@ class WazeBottomPanel extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(14),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
         child: Column(
           children: [
             Container(
