@@ -1228,6 +1228,7 @@
     let currentSlide = 0;
     let isAutoPlay = true;
     let isSpeechEnabled = false;
+    let slideTimer = null;
     let progressPercent = 0;
     const SLIDE_DURATION = 9000; // 9 seconds per slide
 
@@ -1313,6 +1314,12 @@
     function playSlideAudio(index) {
       const slideAudio = document.getElementById('slide-audio');
       if (!slideAudio) return;
+
+      if (slideTimer) {
+        clearTimeout(slideTimer);
+        slideTimer = null;
+      }
+
       slideAudio.pause();
       slideAudio.src = `/audio/slide_${index}.mp3`;
       slideAudio.currentTime = 0;
@@ -1322,6 +1329,11 @@
         p.catch(err => {
           console.warn("MP3 play failed, falling back to TTS:", err);
           fallbackSpeech(speechTexts[index]);
+          if (isAutoPlay) {
+            slideTimer = setTimeout(() => {
+              if (isAutoPlay) nextSlide();
+            }, 8500);
+          }
         });
       }
     }
@@ -1330,6 +1342,12 @@
       if (index < 0) index = 0;
       if (index >= TOTAL_SLIDES) index = 0;
       currentSlide = index;
+
+      // Always clear any pending transition timer from previous slide!
+      if (slideTimer) {
+        clearTimeout(slideTimer);
+        slideTimer = null;
+      }
 
       document.querySelectorAll('.slide').forEach((s, idx) => {
         s.classList.toggle('active', idx === currentSlide);
@@ -1366,6 +1384,10 @@
 
     function toggleAutoPlay() {
       isAutoPlay = !isAutoPlay;
+      if (!isAutoPlay && slideTimer) {
+        clearTimeout(slideTimer);
+        slideTimer = null;
+      }
       const icon = isAutoPlay ? '⏸️' : '▶️';
       const text = isAutoPlay ? 'إيقاف مؤقت' : 'تشغيل العرض';
       document.getElementById('play-icon').innerText = icon;
@@ -1377,6 +1399,11 @@
     function toggleSpeech() {
       isSpeechEnabled = !isSpeechEnabled;
       playChime(659, 880); // Audible confirmation
+
+      if (slideTimer) {
+        clearTimeout(slideTimer);
+        slideTimer = null;
+      }
 
       const icon = isSpeechEnabled ? '🔇' : '🔊';
       const text = isSpeechEnabled ? 'كتم الصوت' : 'تشغيل الصوت';
@@ -1409,15 +1436,21 @@
       }
     }
 
-    // Advance slide when audio ends if in autoplay
+    // Audio onended handler: smoothly wait 2.2s after speech finishes, then advance
     window.addEventListener('DOMContentLoaded', () => {
       const slideAudio = document.getElementById('slide-audio');
       if (slideAudio) {
         slideAudio.onended = () => {
+          const pBar = document.getElementById('progress-bar');
+          if (pBar) pBar.style.width = '100%';
+
           if (isAutoPlay && isSpeechEnabled) {
-            setTimeout(() => {
-              if (isAutoPlay && isSpeechEnabled) nextSlide();
-            }, 1200);
+            if (slideTimer) clearTimeout(slideTimer);
+            slideTimer = setTimeout(() => {
+              if (isAutoPlay && isSpeechEnabled) {
+                nextSlide();
+              }
+            }, 2200); // 2.2s contemplation pause before next slide
           }
         };
       }
@@ -1452,24 +1485,28 @@
       }
     }
 
-    // Timer Loop
+    // Timer Loop: ONLY advances slides when speech is disabled!
     setInterval(() => {
       if (!isAutoPlay) return;
-      // If voice is speaking, let the audio onended event drive slide transition
+
       const slideAudio = document.getElementById('slide-audio');
       if (isSpeechEnabled && slideAudio && !slideAudio.paused && !slideAudio.ended) {
+        // While audio is actively playing, smoothly update progress bar according to audio time
         if (slideAudio.duration) {
-          progressPercent = (slideAudio.currentTime / slideAudio.duration) * 100;
+          progressPercent = Math.min((slideAudio.currentTime / slideAudio.duration) * 100, 100);
+          const pBar = document.getElementById('progress-bar');
+          if (pBar) pBar.style.width = progressPercent + '%';
         }
-      } else {
+      } else if (!isSpeechEnabled) {
+        // Only when speech is disabled does this timer drive slide progression!
         progressPercent += (100 / (SLIDE_DURATION / 100));
         if (progressPercent >= 100) {
           progressPercent = 0;
           nextSlide();
         }
+        const pBar = document.getElementById('progress-bar');
+        if (pBar) pBar.style.width = Math.min(progressPercent, 100) + '%';
       }
-      const pBar = document.getElementById('progress-bar');
-      if (pBar) pBar.style.width = Math.min(progressPercent, 100) + '%';
     }, 100);
 
     // Keyboard navigation
