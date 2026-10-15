@@ -396,8 +396,8 @@ class _WazeVoiceSearchSheetState extends State<WazeVoiceSearchSheet>
                       Flexible(
                         child: Text(
                           ar
-                              ? 'مثال: "اريد الذهاب لمطعم رويال كالاكسي في المنصور"'
-                              : 'e.g. "Take me to Royal Galaxy restaurant in Mansour"',
+                              ? 'مثال: "اريد الذهاب لساحة الفردوس"'
+                              : 'e.g. "Take me to Firdos Square"',
                           style: const TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w600,

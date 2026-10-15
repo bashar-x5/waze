@@ -115,7 +115,7 @@ class DarbCarScreen(carContext: CarContext) : Screen(carContext), CarBridge.Stat
         // Prominent 1-tap voice search row directly in the car list
         val voiceRow = Row.Builder()
             .setTitle("🎤 بحث صوتي / Voice Navigation")
-            .addText("قل: 'اريد الذهاب لمطعم رويال كالاكسي في المنصور'")
+            .addText("قل: 'اريد الذهاب لساحة الفردوس'")
             .setOnClickListener {
                 screenManager.push(DarbCarSearchScreen(carContext))
             }

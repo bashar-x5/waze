@@ -95,7 +95,7 @@ class DarbCarSearchScreen(carContext: CarContext) : Screen(carContext),
             listBuilder.addItem(
                 Row.Builder()
                     .setTitle("🎤 الملاحة الصوتية الذكية (عراقي / فصحى)")
-                    .addText("قل: 'اريد الذهاب لمطعم رويال كالاكسي في المنصور'")
+                    .addText("قل: 'اريد الذهاب لساحة الفردوس'")
                     .build()
             )
             listBuilder.addItem(
@@ -140,7 +140,7 @@ class DarbCarSearchScreen(carContext: CarContext) : Screen(carContext),
 
         return SearchTemplate.Builder(searchCallback)
             .setHeaderAction(Action.BACK)
-            .setSearchHint("تحدث أو ابحث: 'مطعم رويال كالاكسي' / Speak")
+            .setSearchHint("تحدث أو ابحث: 'ساحة الفردوس' / Speak")
             .setShowKeyboardByDefault(false)
             .setItemList(listBuilder.build())
             .build()

@@ -211,6 +211,7 @@ class VoiceCommandParser {
     final commonNouns = [
       'مطعم',
       'مول',
+      'ساحة',
       'فندق',
       'مستشفى',
       'مشفى',

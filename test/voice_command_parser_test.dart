@@ -11,6 +11,12 @@ void main() {
       expect(res.destinationQuery, equals('مطعم رويال كالاكسي المنصور'));
     });
 
+    test('parses Firdos Square: اريد الذهاب لساحة الفردوس', () {
+      final res = parser.parse('اريد الذهاب لساحة الفردوس');
+      expect(res.intent, equals(VoiceIntentType.navigate));
+      expect(res.destinationQuery, equals('ساحة الفردوس'));
+    });
+
     test('parses Iraqi phrasing: وديني لمول بغداد الحارثية', () {
       final res = parser.parse('وديني لمول بغداد الحارثية');
       expect(res.intent, equals(VoiceIntentType.navigate));
