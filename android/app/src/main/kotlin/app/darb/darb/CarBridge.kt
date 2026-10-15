@@ -10,6 +10,7 @@ data class CarNavState(
     val isNavigating: Boolean = false,
     val instruction: String = "",
     val distanceText: String = "",
+    val stepDistanceMeters: Double = 0.0,
     val etaText: String = "",
     val remainingDistanceText: String = "",
     val roadName: String = "",
@@ -24,6 +25,15 @@ data class CarSavedPlace(
     val lon: Double
 )
 
+data class CarSearchResult(
+    val id: String,
+    val title: String,
+    val subtitle: String,
+    val lat: Double,
+    val lon: Double,
+    val distanceText: String = ""
+)
+
 object CarBridge : MethodChannel.MethodCallHandler {
     private const val CHANNEL_NAME = "app.darb.darb/android_auto"
     private var channel: MethodChannel? = null
@@ -35,17 +45,44 @@ object CarBridge : MethodChannel.MethodCallHandler {
     var savedPlaces = mutableListOf<CarSavedPlace>()
         private set
 
-    var stateListener: StateListener? = null
-        set(value) {
-            field = value
-            value?.onStateChanged(currentState)
-            value?.onSavedPlacesChanged(savedPlaces)
-        }
+    var searchResults = mutableListOf<CarSearchResult>()
+        private set
+
+    private val stateListeners = mutableSetOf<StateListener>()
+
+    var searchListener: SearchListener? = null
+
+    val isRegistered: Boolean
+        get() = channel != null
 
     interface StateListener {
         fun onStateChanged(state: CarNavState)
         fun onSavedPlacesChanged(places: List<CarSavedPlace>)
     }
+
+    interface SearchListener {
+        fun onSearchResultsChanged(results: List<CarSearchResult>)
+        fun onSearchStatusChanged(status: String)
+    }
+
+    fun addStateListener(listener: StateListener) {
+        stateListeners.add(listener)
+        listener.onStateChanged(currentState)
+        listener.onSavedPlacesChanged(savedPlaces)
+    }
+
+    fun removeStateListener(listener: StateListener) {
+        stateListeners.remove(listener)
+    }
+
+    var stateListener: StateListener?
+        get() = stateListeners.firstOrNull()
+        set(value) {
+            stateListeners.clear()
+            if (value != null) {
+                addStateListener(value)
+            }
+        }
 
     fun registerWith(messenger: BinaryMessenger) {
         val ch = MethodChannel(messenger, CHANNEL_NAME)
@@ -65,6 +102,7 @@ object CarBridge : MethodChannel.MethodCallHandler {
                 val isNavigating = args?.get("isNavigating") as? Boolean ?: false
                 val instruction = args?.get("instruction") as? String ?: ""
                 val distanceText = args?.get("distanceText") as? String ?: ""
+                val stepDistanceMeters = (args?.get("stepDistanceMeters") as? Number)?.toDouble() ?: 0.0
                 val etaText = args?.get("etaText") as? String ?: ""
                 val remainingDist = args?.get("remainingDistanceText") as? String ?: ""
                 val roadName = args?.get("roadName") as? String ?: ""
@@ -74,6 +112,7 @@ object CarBridge : MethodChannel.MethodCallHandler {
                     isNavigating = isNavigating,
                     instruction = instruction,
                     distanceText = distanceText,
+                    stepDistanceMeters = stepDistanceMeters,
                     etaText = etaText,
                     remainingDistanceText = remainingDist,
                     roadName = roadName,
@@ -81,7 +120,7 @@ object CarBridge : MethodChannel.MethodCallHandler {
                 )
 
                 mainHandler.post {
-                    stateListener?.onStateChanged(currentState)
+                    stateListeners.forEach { it.onStateChanged(currentState) }
                 }
                 result.success(true)
             }
@@ -102,7 +141,36 @@ object CarBridge : MethodChannel.MethodCallHandler {
                 }
                 savedPlaces = updated
                 mainHandler.post {
-                    stateListener?.onSavedPlacesChanged(savedPlaces)
+                    stateListeners.forEach { it.onSavedPlacesChanged(savedPlaces) }
+                }
+                result.success(true)
+            }
+            "updateSearchResults" -> {
+                val list = call.arguments as? List<*>
+                val updated = mutableListOf<CarSearchResult>()
+                list?.forEach { item ->
+                    if (item is Map<*, *>) {
+                        val id = item["id"] as? String ?: ""
+                        val title = item["title"] as? String ?: ""
+                        val subtitle = item["subtitle"] as? String ?: ""
+                        val lat = (item["lat"] as? Number)?.toDouble() ?: 0.0
+                        val lon = (item["lon"] as? Number)?.toDouble() ?: 0.0
+                        val dist = item["distanceText"] as? String ?: ""
+                        if (id.isNotEmpty()) {
+                            updated.add(CarSearchResult(id, title, subtitle, lat, lon, dist))
+                        }
+                    }
+                }
+                searchResults = updated
+                mainHandler.post {
+                    searchListener?.onSearchResultsChanged(searchResults)
+                }
+                result.success(true)
+            }
+            "setSearchStatus" -> {
+                val status = call.arguments as? String ?: ""
+                mainHandler.post {
+                    searchListener?.onSearchStatusChanged(status)
                 }
                 result.success(true)
             }
@@ -122,6 +190,24 @@ object CarBridge : MethodChannel.MethodCallHandler {
     fun notifyStopNavigation() {
         mainHandler.post {
             channel?.invokeMethod("onStopNavigation", null)
+        }
+    }
+
+    fun notifyVoiceSearchSubmitted(query: String) {
+        mainHandler.post {
+            channel?.invokeMethod(
+                "onVoiceSearchSubmitted",
+                mapOf("query" to query)
+            )
+        }
+    }
+
+    fun notifySearchTextChanged(query: String) {
+        mainHandler.post {
+            channel?.invokeMethod(
+                "onSearchQueryChanged",
+                mapOf("query" to query)
+            )
         }
     }
 }

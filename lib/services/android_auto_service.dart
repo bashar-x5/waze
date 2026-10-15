@@ -1,16 +1,21 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../app/app_controller.dart';
 import '../domain/models.dart';
+import '../domain/voice_command_parser.dart';
 
-/// Bridges active navigation state, routes, and saved places to Android Auto
+/// Bridges active navigation state, routes, voice navigation, and saved places to Android Auto
 class AndroidAutoService {
   AndroidAutoService(this.controller) {
     _channel.setMethodCallHandler(_handleMethodCall);
     controller.addListener(_onControllerChanged);
     _onControllerChanged();
   }
+
+  @visibleForTesting
+  Future<dynamic> handleMethodCall(MethodCall call) => _handleMethodCall(call);
 
   final AppController controller;
   static const MethodChannel _channel = MethodChannel('app.darb.darb/android_auto');
@@ -59,14 +64,95 @@ class AndroidAutoService {
             point: LatLng(lat, lon),
           );
 
-          controller.chooseDestination(target);
+          await controller.chooseDestination(target);
+          if (controller.routes.isNotEmpty) {
+            await controller.startNavigation();
+          }
         }
         break;
 
       case 'onStopNavigation':
         controller.stopNavigation();
         break;
+
+      case 'onVoiceSearchSubmitted':
+        final args = call.arguments as Map?;
+        final rawQuery = args?['query'] as String? ?? '';
+        if (rawQuery.trim().isEmpty) return false;
+
+        final parser = const VoiceCommandParser();
+        final result = parser.parse(rawQuery);
+
+        // 1. Non-navigation voice commands (Cancel, Mute, Hazard, etc.)
+        if (result.intent != VoiceIntentType.navigate) {
+          await controller.executeVoiceCommand(result);
+          final statusMsg = result.intent == VoiceIntentType.reportHazard
+              ? (controller.arabic ? 'تم تسجيل البلاغ بنجاح' : 'Hazard reported')
+              : (controller.arabic ? 'تم تنفيذ الأمر الصوتي' : 'Command executed');
+          try {
+            await _channel.invokeMethod('setSearchStatus', statusMsg);
+          } catch (_) {}
+          return {'action': 'command_executed', 'intent': result.intent.name};
+        }
+
+        // 2. Navigation Intent: Extract clean destination query
+        final targetQuery = result.destinationQuery.isNotEmpty ? result.destinationQuery : rawQuery;
+        final places = await controller.searchPlacesDirect(targetQuery);
+
+        if (places.isNotEmpty) {
+          // Send all matching places to Android Auto
+          _sendSearchResults(places);
+
+          // Immediately navigate to the highest confidence match
+          final bestMatch = places.first;
+          await controller.navigateToPlaceFromVoice(bestMatch);
+          return {'action': 'navigating', 'placeId': bestMatch.id};
+        } else {
+          final notFoundMsg = controller.arabic
+              ? 'لم نعثر على "$targetQuery". حاول تحديد المكان بشكل أدق.'
+              : 'No places found for "$targetQuery". Please try again.';
+          try {
+            await _channel.invokeMethod('setSearchStatus', notFoundMsg);
+          } catch (_) {}
+          return {'action': 'not_found', 'query': targetQuery};
+        }
+
+      case 'onSearchQueryChanged':
+        final args = call.arguments as Map?;
+        final query = args?['query'] as String? ?? '';
+        if (query.trim().length >= 2) {
+          final parser = const VoiceCommandParser();
+          final cleanQuery = parser.extractDestination(query);
+          final places = await controller.searchPlacesDirect(
+            cleanQuery.isNotEmpty ? cleanQuery : query,
+          );
+          _sendSearchResults(places);
+        }
+        break;
     }
+  }
+
+  void _sendSearchResults(List<Place> places) {
+    final arabic = controller.arabic;
+    final results = places.take(6).map((p) {
+      final distMeters = const Distance().as(
+        LengthUnit.Meter,
+        controller.position,
+        p.point,
+      );
+      return {
+        'id': p.id,
+        'title': p.label(arabic),
+        'subtitle': p.detail(arabic),
+        'lat': p.point.latitude,
+        'lon': p.point.longitude,
+        'distanceText': controller.distance(distMeters),
+      };
+    }).toList();
+
+    try {
+      _channel.invokeMethod('updateSearchResults', results);
+    } catch (_) {}
   }
 
   void _onControllerChanged() {
@@ -83,12 +169,14 @@ class AndroidAutoService {
     RouteStep? step;
     var etaText = '';
     var remainingDistanceText = '';
+    var stepDistMeters = 0.0;
 
     if (r != null && p != null && r.steps.isNotEmpty) {
       final stepIdx = p.stepIndex.clamp(0, r.steps.length - 1);
       step = r.steps[stepIdx];
       etaText = controller.duration(p.remainingSeconds);
       remainingDistanceText = controller.distance(p.remainingMeters);
+      stepDistMeters = step.distanceMeters;
     }
 
     var maneuverCode = 1; // Default Straight
@@ -118,6 +206,7 @@ class AndroidAutoService {
         'isNavigating': navigating,
         'instruction': step != null ? step.label(arabic) : '',
         'distanceText': step != null ? controller.distance(step.distanceMeters) : '',
+        'stepDistanceMeters': stepDistMeters,
         'etaText': etaText,
         'remainingDistanceText': remainingDistanceText,
         'roadName': step?.roadName ?? '',

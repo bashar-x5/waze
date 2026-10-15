@@ -4,8 +4,6 @@ import androidx.car.app.CarContext
 import androidx.car.app.Screen
 import androidx.car.app.model.Action
 import androidx.car.app.model.ActionStrip
-import androidx.car.app.model.CarColor
-import androidx.car.app.model.CarIcon
 import androidx.car.app.model.Distance
 import androidx.car.app.model.ItemList
 import androidx.car.app.model.PlaceListMapTemplate
@@ -15,11 +13,19 @@ import androidx.car.app.navigation.model.Maneuver
 import androidx.car.app.navigation.model.NavigationTemplate
 import androidx.car.app.navigation.model.RoutingInfo
 import androidx.car.app.navigation.model.Step
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 
 class DarbCarScreen(carContext: CarContext) : Screen(carContext), CarBridge.StateListener {
 
     init {
-        CarBridge.stateListener = this
+        CarBridge.addStateListener(this)
+
+        lifecycle.addObserver(LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_DESTROY) {
+                CarBridge.removeStateListener(this)
+            }
+        })
     }
 
     override fun onStateChanged(state: CarNavState) {
@@ -41,6 +47,13 @@ class DarbCarScreen(carContext: CarContext) : Screen(carContext), CarBridge.Stat
 
     private fun buildNavigatingTemplate(state: CarNavState): Template {
         try {
+            val voiceAction = Action.Builder()
+                .setTitle("صوتي / Voice")
+                .setOnClickListener {
+                    screenManager.push(DarbCarSearchScreen(carContext))
+                }
+                .build()
+
             val stopAction = Action.Builder()
                 .setTitle("إنهاء / Stop")
                 .setOnClickListener {
@@ -49,6 +62,7 @@ class DarbCarScreen(carContext: CarContext) : Screen(carContext), CarBridge.Stat
                 .build()
 
             val actionStrip = ActionStrip.Builder()
+                .addAction(voiceAction)
                 .addAction(stopAction)
                 .build()
 
@@ -72,8 +86,13 @@ class DarbCarScreen(carContext: CarContext) : Screen(carContext), CarBridge.Stat
 
             val step = stepBuilder.build()
 
-            // Safe fallback distance display (100 meters standard scale)
-            val distance = Distance.create(0.1, Distance.UNIT_KILOMETERS)
+            // Dynamic distance calculation based on remaining step meters
+            val distKm = if (state.stepDistanceMeters > 0) {
+                (state.stepDistanceMeters / 1000.0).coerceAtLeast(0.05)
+            } else {
+                0.1
+            }
+            val distance = Distance.create(distKm, Distance.UNIT_KILOMETERS)
 
             val routingInfo = RoutingInfo.Builder()
                 .setCurrentStep(step, distance)
@@ -93,15 +112,25 @@ class DarbCarScreen(carContext: CarContext) : Screen(carContext), CarBridge.Stat
         val listBuilder = ItemList.Builder()
         val places = CarBridge.savedPlaces
 
+        // Prominent 1-tap voice search row directly in the car list
+        val voiceRow = Row.Builder()
+            .setTitle("🎤 بحث صوتي / Voice Navigation")
+            .addText("قل: 'اريد الذهاب لمطعم رويال كالاكسي في المنصور'")
+            .setOnClickListener {
+                screenManager.push(DarbCarSearchScreen(carContext))
+            }
+            .build()
+        listBuilder.addItem(voiceRow)
+
         if (places.isEmpty()) {
             listBuilder.addItem(
                 Row.Builder()
                     .setTitle("درب - جاهز للملاحة")
-                    .addText("اختر وجهتك من الهاتف أو المحفوظات")
+                    .addText("اختر وجهتك بالصوت أو من الهاتف")
                     .build()
             )
         } else {
-            for (place in places.take(6)) {
+            for (place in places.take(5)) {
                 val rowBuilder = Row.Builder()
                     .setTitle(place.title)
                     .addText(place.subtitle)
@@ -112,6 +141,13 @@ class DarbCarScreen(carContext: CarContext) : Screen(carContext), CarBridge.Stat
             }
         }
 
+        val voiceAction = Action.Builder()
+            .setTitle("صوتي / Voice")
+            .setOnClickListener {
+                screenManager.push(DarbCarSearchScreen(carContext))
+            }
+            .build()
+
         val refreshAction = Action.Builder()
             .setTitle("تحديث / Refresh")
             .setOnClickListener {
@@ -120,6 +156,7 @@ class DarbCarScreen(carContext: CarContext) : Screen(carContext), CarBridge.Stat
             .build()
 
         val actionStrip = ActionStrip.Builder()
+            .addAction(voiceAction)
             .addAction(refreshAction)
             .build()
 
