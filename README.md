@@ -1,4 +1,4 @@
-﻿# Darb (درب) — Iraq-First Open-Source Community Navigation (Waze Alternative)
+# Darb (درب) — Iraq-First Open-Source Community Navigation (Waze Alternative)
 
 A full-featured, community-driven GPS navigation ecosystem built with Flutter, MapLibre GL 3D vector maps, and an ASP.NET Core 9 / PostGIS backend, delivering the iconic **Waze** experience with **100% free, open-source infrastructure** and **zero user-side API fees**.
 
@@ -6,7 +6,14 @@ A full-featured, community-driven GPS navigation ecosystem built with Flutter, M
 
 ## 📲 Download & Live Links
 
-- 📱 **Download Android APK**: [http://139.185.47.123:5000/darb.apk](http://139.185.47.123:5000/darb.apk)
+| Direct APK | Permanent QR Code | Web Operations Dashboard |
+|:---:|:---:|:---:|
+| [**Download Darb APK**](http://139.185.47.123:5000/darb.apk)<br/>*(86 MB • Android 8.0+)* | <img src="assets/images/darb_qr.png" width="180" alt="Darb Permanent QR Code"/><br/>*(Scan with phone camera)* | [**Live Traffic Dashboard**](http://139.185.47.123:5000/)<br/>*(Interactive Baghdad Telemetry)* |
+
+- 📱 **Direct APK Download**: [http://139.185.47.123:5000/darb.apk](http://139.185.47.123:5000/darb.apk)
+- 📷 **Permanent QR Image (PNG)**: [http://139.185.47.123:5000/qr.png](http://139.185.47.123:5000/qr.png)
+- 📐 **Scalable Vector QR (SVG)**: [http://139.185.47.123:5000/qr.svg](http://139.185.47.123:5000/qr.svg)
+- 🎴 **Branded Share & Print Card**: [http://139.185.47.123:5000/darb_qr_card.png](http://139.185.47.123:5000/darb_qr_card.png)
 - 🌐 **Live Web Traffic Dashboard**: [http://139.185.47.123:5000/](http://139.185.47.123:5000/)
 - 📖 **Complete Features Guide**: [FEATURES.md](FEATURES.md)
 

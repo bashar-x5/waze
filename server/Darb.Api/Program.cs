@@ -353,6 +353,37 @@ app.MapGet("/darb.apk", (IWebHostEnvironment env) =>
 })
 .WithName("DownloadDarbApk");
 
+app.MapGet("/qr", () => Results.Redirect("/qr.png"))
+   .WithName("QrRedirect");
+
+app.MapGet("/qr.png", (IWebHostEnvironment env) =>
+{
+    var candidates = new[]
+    {
+        Path.Combine(env.WebRootPath ?? "wwwroot", "qr.png"),
+        Path.Combine(AppContext.BaseDirectory, "wwwroot", "qr.png"),
+        "/app/wwwroot/qr.png",
+        "wwwroot/qr.png"
+    };
+    var found = candidates.FirstOrDefault(File.Exists);
+    return found != null ? Results.File(found, "image/png", "darb-qr.png") : Results.NotFound(new { error = "QR code not found." });
+})
+.WithName("GetQrPng");
+
+app.MapGet("/qr.svg", (IWebHostEnvironment env) =>
+{
+    var candidates = new[]
+    {
+        Path.Combine(env.WebRootPath ?? "wwwroot", "qr.svg"),
+        Path.Combine(AppContext.BaseDirectory, "wwwroot", "qr.svg"),
+        "/app/wwwroot/qr.svg",
+        "wwwroot/qr.svg"
+    };
+    var found = candidates.FirstOrDefault(File.Exists);
+    return found != null ? Results.File(found, "image/svg+xml", "darb-qr.svg") : Results.NotFound(new { error = "QR SVG not found." });
+})
+.WithName("GetQrSvg");
+
 app.MapGet("/api/dashboard/stats", async (
     DarbDbContext db,
     IHttpClientFactory httpClientFactory,

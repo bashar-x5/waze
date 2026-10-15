@@ -17,7 +17,8 @@ This document provides complete operational, architectural, and development cont
 - **Server IP**: 139.185.47.123
 - **Port**: 5000 (HTTP)
 - **Live Web Traffic Dashboard**: http://139.185.47.123:5000/ (Esri Dark Gray + OSM multi-basemap, live incidents, traffic flow).
-- **Direct APK Download**: http://139.185.47.123:5000/darb.apk (Configured MIME type pplication/vnd.android.package-archive).
+- **Direct APK Download**: http://139.185.47.123:5000/darb.apk (Configured MIME type application/vnd.android.package-archive).
+- **Permanent QR Code**: http://139.185.47.123:5000/qr.png (or /qr.svg, /darb_qr_card.png) — static, permanent, no 3rd party expiration.
 - **Server Stack**: ASP.NET Core 9 Minimal API (server/Darb.Api), PostgreSQL 16 + PostGIS, Docker, systemd.
 - **TomTom Traffic Harvester**: Runs server-side (TrafficAggregationWorker.cs and TomTomTrafficHarvester.cs), harvesting Baghdad's 8 major corridors every 5 minutes into PostGIS. Client queries /api/traffic/conditions directly from this local database, never consuming external API quotas on user devices.
 - **SSH Access**: ssh -i <a> ubuntu@139.185.47.123 (Private key file  is stored locally and excluded in .gitignore).

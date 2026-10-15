@@ -570,6 +570,47 @@
       margin-bottom: 6px !important;
       cursor: pointer !important;
     }
+
+    /* Permanent QR Modal & Card Styles */
+    .modal-backdrop {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(4, 7, 12, 0.85);
+      backdrop-filter: blur(8px);
+      z-index: 9999;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+    .modal-backdrop.show {
+      display: flex;
+    }
+    .modal-content {
+      background: var(--bg-panel);
+      border: 1px solid var(--border-glow);
+      border-radius: 18px;
+      max-width: 500px;
+      width: 100%;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.7);
+      animation: modalIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+      overflow: hidden;
+    }
+    @keyframes modalIn {
+      from { opacity: 0; transform: scale(0.92) translateY(10px); }
+      to { opacity: 1; transform: scale(1) translateY(0); }
+    }
+    .modal-header {
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: rgba(0, 0, 0, 0.2);
+    }
   </style>
 </head>
 <body>
@@ -595,6 +636,10 @@
         <span>📱</span>
         <span id="btn-dl-apk">تحميل APK</span>
       </a>
+      <button class="btn" onclick="openQrModal()" id="btn-qr-modal" style="background: rgba(0, 210, 255, 0.2); border: 1px solid var(--primary); color: var(--primary); font-weight: 700; display: inline-flex; align-items: center; gap: 6px; cursor: pointer;">
+        <span>📷</span>
+        <span id="btn-qr-txt">رمز QR للتحميل</span>
+      </button>
       <button class="btn" onclick="toggleLang()" id="btn-lang">English</button>
       <button class="btn btn-primary" onclick="fetchLiveStats(true)">
         <span>🔄</span>
@@ -771,6 +816,27 @@
             <div>Backend: <span style="color: var(--primary);">ASP.NET Core 10 Web API</span></div>
           </div>
         </div>
+
+        <!-- Permanent QR Widget Card -->
+        <div class="panel" style="background: linear-gradient(135deg, rgba(0, 210, 255, 0.08), rgba(16, 23, 34, 0.9)); border: 1px solid rgba(0, 210, 255, 0.3);">
+          <div class="panel-header">
+            <h2><span>📲</span> <span id="lbl-qr-widget-title">تحميل تطبيق درب (QR دائم)</span></h2>
+            <button class="btn-sm" onclick="openQrModal()"><span>🔍</span> <span id="btn-qr-widget-zoom">تكبير</span></button>
+          </div>
+          <div style="display: flex; align-items: center; gap: 14px; padding: 4px 0;">
+            <div style="background: #ffffff; padding: 6px; border-radius: 12px; flex-shrink: 0; box-shadow: 0 0 12px rgba(0, 210, 255, 0.25); cursor: pointer;" onclick="openQrModal()" title="اضغط للتكبير">
+              <img src="/qr.png" alt="Darb QR" style="width: 76px; height: 76px; display: block; image-rendering: pixelated;">
+            </div>
+            <div style="font-size: 11px; line-height: 1.6; color: var(--text-muted);">
+              <div style="color: #fff; font-weight: 700; margin-bottom: 2px;" id="lbl-qr-widget-head">امسح بكاميرا هاتفك</div>
+              <div id="lbl-qr-widget-desc">تحميل فوري ومباشر لملف APK (86 MB)، كود دائم بدون أي وسيط خارجي.</div>
+              <div style="margin-top: 6px; display: flex; gap: 6px;">
+                <button class="btn btn-sm" onclick="openQrModal()" style="font-size: 10px; padding: 4px 8px;"><span>📷</span> <span id="btn-qr-widget-open">عرض الرمز</span></button>
+                <a href="/darb.apk" class="btn btn-sm btn-primary" style="font-size: 10px; padding: 4px 8px; text-decoration: none;"><span>⬇️</span> <span id="btn-qr-widget-dl">تحميل</span></a>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -787,6 +853,59 @@
       </div>
     </div>
   </main>
+
+  <!-- Permanent QR Modal Dialog -->
+  <div id="qr-modal" class="modal-backdrop" onclick="closeQrModal(event)">
+    <div class="modal-content" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <div class="brand-logo" style="width: 36px; height: 36px;">
+            <svg viewBox="0 0 24 24"><path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"/></svg>
+          </div>
+          <div>
+            <h3 id="qr-modal-title" style="font-size: 16px; font-weight: 800; color: #fff;">رمز QR الدائم لتحميل تطبيق درب (APK)</h3>
+            <p id="qr-modal-sub" style="font-size: 11px; color: var(--text-muted);">Direct Permanent APK Download • دائم ولا تنتهي صلاحيته</p>
+          </div>
+        </div>
+        <button class="btn-sm" onclick="closeQrModal()" style="font-size: 16px; padding: 4px 10px;">✕</button>
+      </div>
+
+      <div class="modal-body" style="text-align: center; padding: 20px 18px;">
+        <!-- High Contrast QR Image Container -->
+        <div style="background: #ffffff; padding: 16px; border-radius: 20px; display: inline-block; box-shadow: 0 0 30px rgba(0, 210, 255, 0.4); border: 3px solid var(--primary); margin-bottom: 16px;">
+          <img src="/qr.png" alt="Darb APK Permanent QR" style="width: 240px; height: 240px; display: block; image-rendering: pixelated; margin: 0 auto;">
+        </div>
+
+        <p id="qr-modal-desc" style="font-size: 13px; color: var(--text); font-weight: 600; margin-bottom: 14px;">
+          وجّه كاميرا هاتفك الذكي (أندرويد / آيفون) لمسح الرمز وتحميل ملف التطبيق مباشرة بدون أي وسيط.
+        </p>
+
+        <!-- Direct URL box with Copy button -->
+        <div style="display: flex; align-items: center; justify-content: space-between; background: rgba(0, 0, 0, 0.45); border: 1px solid var(--border-color); border-radius: 10px; padding: 8px 12px; margin-bottom: 16px; gap: 8px;">
+          <span style="font-family: var(--mono); font-size: 12px; color: var(--primary); word-break: break-all; direction: ltr;" id="qr-url-text">http://139.185.47.123:5000/darb.apk</span>
+          <button class="btn btn-sm" onclick="copyQrUrl()" id="btn-copy-url" style="white-space: nowrap; font-size: 11px;">
+            <span>📋</span> <span id="txt-copy-btn">نسخ الرابط</span>
+          </button>
+        </div>
+
+        <!-- Download & Asset Buttons -->
+        <div style="display: flex; flex-wrap: wrap; gap: 8px; justify-content: center;">
+          <a href="/darb.apk" class="btn btn-primary" style="flex: 1 1 100%; text-decoration: none; justify-content: center; padding: 10px 16px; font-size: 13px;">
+            <span>📱</span> <span id="btn-modal-dl-apk">تحميل APK مباشرة (86 MB)</span>
+          </a>
+          <a href="/qr.png" download="darb-qr.png" class="btn" style="text-decoration: none; flex: 1;">
+            <span>🖼️</span> <span id="btn-modal-dl-png">حفظ الرمز (PNG)</span>
+          </a>
+          <a href="/qr.svg" download="darb-qr.svg" class="btn" style="text-decoration: none; flex: 1;">
+            <span>📐</span> <span id="btn-modal-dl-svg">فيكتور (SVG)</span>
+          </a>
+          <a href="/darb_qr_card.png" download="darb-qr-card.png" class="btn" style="text-decoration: none; flex: 1;">
+            <span>🎴</span> <span id="btn-modal-dl-card">بطاقة المشاركة</span>
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <script>
     // State & Config
@@ -1330,7 +1449,74 @@
       document.getElementById('btn-refresh').innerText = isArabic ? 'تحديث البيانات الآن' : 'Refresh Telemetry';
       const topBtn = document.getElementById('btn-refresh-top');
       if (topBtn) topBtn.innerText = isArabic ? 'تحديث البيانات الحية' : 'Refresh Live Data';
+
+      // QR Elements bilingual
+      const btnQr = document.getElementById('btn-qr-txt');
+      if (btnQr) btnQr.innerText = isArabic ? 'رمز QR للتحميل' : 'QR Download';
+      const qmTitle = document.getElementById('qr-modal-title');
+      if (qmTitle) qmTitle.innerText = isArabic ? 'رمز QR الدائم لتحميل تطبيق درب (APK)' : 'Permanent QR Code — Download Darb APK';
+      const qmSub = document.getElementById('qr-modal-sub');
+      if (qmSub) qmSub.innerText = isArabic ? 'Direct Permanent APK Download • دائم ولا تنتهي صلاحيته' : 'Direct Permanent APK Download • Never Expires';
+      const qmDesc = document.getElementById('qr-modal-desc');
+      if (qmDesc) qmDesc.innerText = isArabic ? 'وجّه كاميرا هاتفك الذكي (أندرويد / آيفون) لمسح الرمز وتحميل ملف التطبيق مباشرة بدون أي وسيط.' : 'Point your phone camera (Android / iOS) to scan and download the APK directly without intermediaries.';
+      const qmCopy = document.getElementById('txt-copy-btn');
+      if (qmCopy) qmCopy.innerText = isArabic ? 'نسخ الرابط' : 'Copy Link';
+      const qmDlApk = document.getElementById('btn-modal-dl-apk');
+      if (qmDlApk) qmDlApk.innerText = isArabic ? 'تحميل APK مباشرة (86 MB)' : 'Direct APK Download (86 MB)';
+      const qmDlPng = document.getElementById('btn-modal-dl-png');
+      if (qmDlPng) qmDlPng.innerText = isArabic ? 'حفظ الرمز (PNG)' : 'Save QR (PNG)';
+      const qmDlSvg = document.getElementById('btn-modal-dl-svg');
+      if (qmDlSvg) qmDlSvg.innerText = isArabic ? 'فيكتور (SVG)' : 'Vector (SVG)';
+      const qmDlCard = document.getElementById('btn-modal-dl-card');
+      if (qmDlCard) qmDlCard.innerText = isArabic ? 'بطاقة المشاركة' : 'Share Card';
+
+      // Sidebar widget bilingual
+      const qwTitle = document.getElementById('lbl-qr-widget-title');
+      if (qwTitle) qwTitle.innerText = isArabic ? 'تحميل تطبيق درب (QR دائم)' : 'Download Darb App (Permanent QR)';
+      const qwZoom = document.getElementById('btn-qr-widget-zoom');
+      if (qwZoom) qwZoom.innerText = isArabic ? 'تكبير' : 'Zoom';
+      const qwHead = document.getElementById('lbl-qr-widget-head');
+      if (qwHead) qwHead.innerText = isArabic ? 'امسح بكاميرا هاتفك' : 'Scan with your phone';
+      const qwDesc = document.getElementById('lbl-qr-widget-desc');
+      if (qwDesc) qwDesc.innerText = isArabic ? 'تحميل فوري ومباشر لملف APK (86 MB)، كود دائم بدون أي وسيط خارجي.' : 'Direct APK download (86 MB), permanent static QR code.';
+      const qwOpen = document.getElementById('btn-qr-widget-open');
+      if (qwOpen) qwOpen.innerText = isArabic ? 'عرض الرمز' : 'View Code';
+      const qwDl = document.getElementById('btn-qr-widget-dl');
+      if (qwDl) qwDl.innerText = isArabic ? 'تحميل' : 'Download';
     }
+
+    // QR Code Modal & Copying
+    function openQrModal() {
+      const modal = document.getElementById('qr-modal');
+      if (modal) modal.classList.add('show');
+    }
+
+    function closeQrModal(e) {
+      if (e && e.target !== e.currentTarget && e.target.tagName !== 'BUTTON') return;
+      const modal = document.getElementById('qr-modal');
+      if (modal) modal.classList.remove('show');
+    }
+
+    function copyQrUrl() {
+      const urlEl = document.getElementById('qr-url-text');
+      if (!urlEl) return;
+      navigator.clipboard.writeText(urlEl.innerText.trim()).then(() => {
+        const copyTxt = document.getElementById('txt-copy-btn');
+        if (copyTxt) {
+          const original = copyTxt.innerText;
+          copyTxt.innerText = isArabic ? 'تم النسخ! ✓' : 'Copied! ✓';
+          setTimeout(() => { copyTxt.innerText = original; }, 2000);
+        }
+      });
+    }
+
+    // Close modal on Escape key
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        const modal = document.getElementById('qr-modal');
+        if (modal && modal.classList.contains('show')) modal.classList.remove('show');
+      }
+    });
 
     // Clock
     setInterval(() => {
