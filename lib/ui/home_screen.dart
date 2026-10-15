@@ -842,9 +842,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                           minimumSize: const Size(0, 32),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                         ),
-                        onPressed: () {
+                        onPressed: () async {
                           final apkUrl = c.updateAvailableInfo!['apkUrl']?.toString() ?? 'http://139.185.47.123:5000/darb.apk';
-                          launchUrl(Uri.parse(apkUrl), mode: LaunchMode.externalApplication);
+                          await c.onUpdateDownloaded();
+                          await launchUrl(Uri.parse(apkUrl), mode: LaunchMode.externalApplication);
                         },
                         child: Text(
                           arabic ? 'تحديث' : 'Update',

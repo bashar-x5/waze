@@ -17,7 +17,7 @@ class VoiceNavigationService {
   bool get isAvailable => _speech.isAvailable;
 
   /// Initializes native speech recognition engine.
-  Future<bool> initialize() async {
+  Future<bool> initialize({void Function(String status)? onStatus}) async {
     if (_isInitialized) return true;
     try {
       _isInitialized = await _speech.initialize(
@@ -26,6 +26,7 @@ class VoiceNavigationService {
         },
         onStatus: (status) {
           debugPrint('Darb Voice Recognition Status: $status');
+          onStatus?.call(status);
         },
         debugLogging: kDebugMode,
       );
@@ -50,12 +51,12 @@ class VoiceNavigationService {
     }
   }
 
-  /// Start listening for voice commands.
+  /// Start listening for voice commands with sentence dictation mode.
   Future<bool> startListening({
     required void Function(String text, bool isFinal) onResult,
     void Function(double level)? onSoundLevelChange,
-    Duration listenFor = const Duration(seconds: 12),
-    Duration pauseFor = const Duration(seconds: 3),
+    Duration listenFor = const Duration(seconds: 30),
+    Duration pauseFor = const Duration(seconds: 5),
   }) async {
     if (!_isInitialized) {
       final ok = await initialize();
@@ -75,7 +76,9 @@ class VoiceNavigationService {
         localeId: _selectedLocaleId,
         listenFor: listenFor,
         pauseFor: pauseFor,
-        listenMode: stt.ListenMode.confirmation,
+        listenMode: stt.ListenMode.dictation,
+        cancelOnError: false,
+        partialResults: true,
       );
       return true;
     } catch (e) {

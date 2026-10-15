@@ -53,6 +53,7 @@ class _WazeVoiceSearchSheetState extends State<WazeVoiceSearchSheet>
   double _soundLevel = 0.0;
   List<Place> _candidatePlaces = [];
   Timer? _autoNavTimer;
+  Timer? _silenceTimer;
   int _navCountdown = 3;
 
   @override
@@ -69,6 +70,7 @@ class _WazeVoiceSearchSheetState extends State<WazeVoiceSearchSheet>
 
   @override
   void dispose() {
+    _silenceTimer?.cancel();
     _autoNavTimer?.cancel();
     _pulseAnim.dispose();
     _voiceService.stopListening();
@@ -77,17 +79,28 @@ class _WazeVoiceSearchSheetState extends State<WazeVoiceSearchSheet>
 
   Future<void> _initAndStartListening() async {
     final ar = widget.controller.arabic;
+    _silenceTimer?.cancel();
     setState(() {
       _state = VoiceSheetState.listening;
       _recognizedText = '';
       _extractedQuery = '';
       _candidatePlaces = [];
       _statusMessage = ar
-          ? 'تحدث الآن... جارٍ الاستماع لوجهتك'
-          : 'Listening... Speak your destination';
+          ? 'تحدث براحتك... جارٍ الاستماع لجملتك بالكامل'
+          : 'Listening... Take your time speaking your destination';
     });
 
-    final ok = await _voiceService.initialize();
+    final ok = await _voiceService.initialize(
+      onStatus: (status) {
+        if (!mounted) return;
+        if ((status == 'notListening' || status == 'done') && _recognizedText.trim().isNotEmpty) {
+          if (_state == VoiceSheetState.listening) {
+            _silenceTimer?.cancel();
+            _handleFinalSpokenText(_recognizedText);
+          }
+        }
+      },
+    );
     if (!ok && mounted) {
       setState(() {
         _state = VoiceSheetState.error;
@@ -101,13 +114,22 @@ class _WazeVoiceSearchSheetState extends State<WazeVoiceSearchSheet>
     await _voiceService.startListening(
       onResult: (text, isFinal) {
         if (!mounted) return;
+        final clean = text.trim();
+        if (clean.isEmpty) return;
+
         setState(() {
           _recognizedText = text;
         });
 
-        if (isFinal && text.trim().isNotEmpty) {
-          _handleFinalSpokenText(text);
-        }
+        // Smart sentence completion:
+        // Reset the silence debounce timer. We wait for 2.4 seconds of continuous silence
+        // after speaking stops before concluding the sentence, preventing mid-phrase cut-offs.
+        _silenceTimer?.cancel();
+        _silenceTimer = Timer(const Duration(milliseconds: 2400), () {
+          if (mounted && _state == VoiceSheetState.listening && _recognizedText.trim().isNotEmpty) {
+            _handleFinalSpokenText(_recognizedText);
+          }
+        });
       },
       onSoundLevelChange: (level) {
         if (mounted) {
@@ -116,12 +138,13 @@ class _WazeVoiceSearchSheetState extends State<WazeVoiceSearchSheet>
           });
         }
       },
-      listenFor: const Duration(seconds: 10),
-      pauseFor: const Duration(seconds: 2),
+      listenFor: const Duration(seconds: 30),
+      pauseFor: const Duration(seconds: 5),
     );
   }
 
   Future<void> _handleFinalSpokenText(String spokenText) async {
+    _silenceTimer?.cancel();
     await _voiceService.stopListening();
     final ar = widget.controller.arabic;
 
@@ -592,6 +615,51 @@ class _WazeVoiceSearchSheetState extends State<WazeVoiceSearchSheet>
       );
     }
 
+    if (_state == VoiceSheetState.listening && _recognizedText.trim().isNotEmpty) {
+      return Row(
+        children: [
+          Expanded(
+            child: OutlinedButton(
+              onPressed: () {
+                _silenceTimer?.cancel();
+                _initAndStartListening();
+              },
+              style: OutlinedButton.styleFrom(
+                side: BorderSide(color: WazeColors.cyan.withOpacity(0.5)),
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              child: Text(
+                ar ? 'إعادة' : 'Restart',
+                style: const TextStyle(color: WazeColors.cyan, fontWeight: FontWeight.w700),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            flex: 2,
+            child: ElevatedButton.icon(
+              onPressed: () {
+                _silenceTimer?.cancel();
+                _handleFinalSpokenText(_recognizedText);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: WazeColors.cyan,
+                foregroundColor: Colors.black87,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              icon: const Icon(Icons.search_rounded),
+              label: Text(
+                ar ? 'تم، ابحث الآن' : 'Done, Search Now',
+                style: const TextStyle(fontWeight: FontWeight.w800),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
     if (_state == VoiceSheetState.error) {
       return ElevatedButton.icon(
         onPressed: _initAndStartListening,
@@ -611,6 +679,7 @@ class _WazeVoiceSearchSheetState extends State<WazeVoiceSearchSheet>
 
     return TextButton.icon(
       onPressed: () {
+        _silenceTimer?.cancel();
         _voiceService.stopListening();
         Navigator.of(context).pop();
       },

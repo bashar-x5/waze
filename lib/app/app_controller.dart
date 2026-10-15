@@ -48,7 +48,8 @@ class AppController extends ChangeNotifier {
   Timer? _simulation;
   Timer? _expiry;
   Timer? _serverIncidentsTimer;
-  static const int localAppVersionCode = 3;
+  static const int localAppVersionCode = 4;
+  static const String localAppVersionName = '1.0.4';
   Map<String, dynamic>? updateAvailableInfo;
   RoadReport? pendingPromptReport;
   final Set<String> _promptedIncidentIds = {};
@@ -805,7 +806,8 @@ class AppController extends ChangeNotifier {
       final info = await _api.checkAppVersion();
       if (info != null) {
         final serverCode = (info['versionCode'] as num?)?.toInt() ?? 0;
-        if (serverCode > localAppVersionCode) {
+        final dismissedCode = _prefs?.getInt('darb.dismissed_update_version.v1') ?? 0;
+        if (serverCode > localAppVersionCode && serverCode > dismissedCode) {
           updateAvailableInfo = info;
           _emit();
         }
@@ -813,8 +815,22 @@ class AppController extends ChangeNotifier {
     } catch (_) {}
   }
 
-  void dismissUpdate() {
+  void dismissUpdate({bool remember = true}) {
+    if (updateAvailableInfo != null && remember) {
+      final serverCode = (updateAvailableInfo!['versionCode'] as num?)?.toInt() ?? 0;
+      if (serverCode > 0) {
+        _prefs?.setInt('darb.dismissed_update_version.v1', serverCode);
+      }
+    }
     updateAvailableInfo = null;
+    _emit();
+  }
+
+  Future<void> onUpdateDownloaded() async {
+    dismissUpdate(remember: true);
+    notice = arabic
+        ? 'تم بدء تحميل النسخة المحدثة. يرجى تثبيتها بعد انتهاء التحميل.'
+        : 'Update download started. Please install it once complete.';
     _emit();
   }
 
