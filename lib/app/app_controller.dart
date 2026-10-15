@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
@@ -108,18 +109,43 @@ class AppController extends ChangeNotifier {
   Future<void> load() async {
     try {
       _prefs = await SharedPreferences.getInstance();
-      final savedId = _prefs!.getString('darb.device_user_id.v1');
-      if (savedId != null && savedId.isNotEmpty) {
-        _sessionId = savedId;
-      } else {
-        final rand = Random();
-        final macLike = List.generate(
-          6,
-          (_) => rand.nextInt(256).toRadixString(16).padLeft(2, '0'),
-        ).join(':').toUpperCase();
-        _sessionId = 'MAC-$macLike';
-        unawaited(_prefs!.setString('darb.device_user_id.v1', _sessionId));
+      var savedId = _prefs!.getString('darb.device_user_id.v1');
+      if (savedId == null || savedId.isEmpty) {
+        // First try to fetch real hardware Android ID from device via native platform channel
+        if (enableDeviceServices && defaultTargetPlatform == TargetPlatform.android) {
+          try {
+            const channel = MethodChannel('app.darb.darb/device');
+            final rawId = await channel
+                .invokeMethod<String>('getHardwareId')
+                .timeout(const Duration(milliseconds: 300), onTimeout: () => null);
+            if (rawId != null && rawId.trim().isNotEmpty) {
+              final hex = rawId.replaceAll(RegExp(r'[^0-9a-fA-F]'), '').toUpperCase();
+              if (hex.length >= 12) {
+                final chunks = <String>[];
+                for (var i = 0; i < 12; i += 2) {
+                  chunks.add(hex.substring(i, i + 2));
+                }
+                savedId = 'MAC-${chunks.join(':')}';
+              } else if (hex.isNotEmpty) {
+                savedId = 'MAC-${hex.padRight(12, '0').substring(0, 12)}';
+              }
+            }
+          } catch (_) {}
+        }
+
+        // Fallback to stable generated MAC only if hardware platform ID is unavailable
+        if (savedId == null || savedId.isEmpty) {
+          final rand = Random();
+          final macLike = List.generate(
+            6,
+            (_) => rand.nextInt(256).toRadixString(16).padLeft(2, '0'),
+          ).join(':').toUpperCase();
+          savedId = 'MAC-$macLike';
+        }
+
+        await _prefs!.setString('darb.device_user_id.v1', savedId);
       }
+      _sessionId = savedId;
       final raw = _prefs!.getString('darb.preferences.v1');
       if (raw != null) {
         final p = jsonDecode(raw) as Map<String, dynamic>;

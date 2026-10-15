@@ -1,0 +1,2 @@
+TRUNCATE TABLE "Users" CASCADE;
+TRUNCATE TABLE "IncidentConfirmations" CASCADE;
