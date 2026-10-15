@@ -3,6 +3,7 @@ import '../../app/app_controller.dart';
 import '../../domain/models.dart';
 import '../waze_theme.dart';
 import 'waze_offline_modal.dart';
+import 'waze_permission_sheet.dart';
 
 class WazeSettingsModal extends StatelessWidget {
   const WazeSettingsModal({super.key, required this.controller});
@@ -278,6 +279,26 @@ class WazeSettingsModal extends StatelessWidget {
                   value: c.sharing,
                   activeThumbColor: WazeColors.cyan,
                   onChanged: (val) => c.setSharing(val),
+                ),
+
+                ListTile(
+                  leading: const Icon(Icons.shield_outlined, color: WazeColors.cyan),
+                  title: Text(
+                    arabic ? 'أذونات الموقع واستخدام البيانات' : 'Location & Data Permissions',
+                    style: TextStyle(color: textColor, fontWeight: FontWeight.w600),
+                  ),
+                  subtitle: Text(
+                    arabic ? 'مراجعة أذونات GPS ومصادر البيانات' : 'Review GPS & network usage permissions',
+                    style: TextStyle(color: dark ? Colors.white60 : Colors.black54, fontSize: 12),
+                  ),
+                  trailing: Icon(
+                    arabic ? Icons.chevron_left_rounded : Icons.chevron_right_rounded,
+                    color: dark ? Colors.white54 : Colors.black45,
+                  ),
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    showWazePermissionSheet(context, controller: c, force: true);
+                  },
                 ),
 
                 const Divider(),

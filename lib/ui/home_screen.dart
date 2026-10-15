@@ -17,6 +17,7 @@ import 'widgets/waze_search_modal.dart';
 import 'widgets/waze_settings_modal.dart';
 import 'widgets/waze_speedometer.dart';
 import 'widgets/waze_voice_search_sheet.dart';
+import 'widgets/waze_permission_sheet.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({
@@ -57,6 +58,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
 
     widget.controller.addListener(_onControllerChange);
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        showWazePermissionSheet(context, controller: widget.controller);
+      }
+    });
   }
 
   @override
