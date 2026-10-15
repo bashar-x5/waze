@@ -69,6 +69,7 @@ class AppController extends ChangeNotifier {
 
   bool arabic = false;
   bool dark = false;
+  bool satellite = false;
   bool miles = false;
   bool voice = true;
   bool lessChatty = false;
@@ -186,6 +187,7 @@ class AppController extends ChangeNotifier {
         final p = jsonDecode(raw) as Map<String, dynamic>;
         arabic = p['arabic'] == true;
         dark = p['dark'] == true;
+        satellite = p['satellite'] == true;
         miles = p['miles'] == true;
         voice = p['voice'] != false;
         lessChatty = p['lessChatty'] == true;
@@ -239,7 +241,7 @@ class AppController extends ChangeNotifier {
   void clearMessage() { error = null; notice = null; _emit(); }
   Future<void> _save() {
     final data = jsonEncode({
-      'arabic': arabic, 'dark': dark, 'miles': miles, 'voice': voice,
+      'arabic': arabic, 'dark': dark, 'satellite': satellite, 'miles': miles, 'voice': voice,
       'lessChatty': lessChatty, 'homeId': homeId, 'workId': workId,
       'saved': saved.map((p) => p.toJson()).toList(),
       'recent': recent.take(10).map((p) => p.toJson()).toList(),
@@ -257,6 +259,7 @@ class AppController extends ChangeNotifier {
 
   void setLanguage(bool value) { arabic = value; _spokenStep = -1; _spokenManeuverSignatures.clear(); _lastSpokenPhrase = null; _save(); _emit(); }
   void setDark(bool value) { dark = value; _save(); _emit(); }
+  void setSatellite(bool value) { if (value == satellite) return; satellite = value; _save(); _emit(); }
   void setMiles(bool value) { miles = value; _save(); _emit(); }
   void setVoice(bool value) { voice = value; if (!value) _tts?.stop(); _save(); _emit(); }
   void setLessChatty(bool value) { lessChatty = value; _save(); _emit(); }

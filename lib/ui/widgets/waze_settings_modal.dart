@@ -162,6 +162,20 @@ class WazeSettingsModal extends StatelessWidget {
                 ),
                 SwitchListTile(
                   title: Text(
+                    arabic ? 'عرض القمر الصناعي ثلاثي الأبعاد (3D Satellite)' : '3D Satellite View',
+                    style: TextStyle(color: textColor, fontWeight: FontWeight.w600),
+                  ),
+                  subtitle: Text(
+                    arabic ? 'صور فضائية عالية الدقة مع أسماء الشوارع والمباني' : 'High-resolution satellite view with road and place labels',
+                    style: TextStyle(color: dark ? Colors.white60 : Colors.black54, fontSize: 12),
+                  ),
+                  value: c.satellite,
+                  activeThumbColor: Colors.amber,
+                  secondary: const Icon(Icons.satellite_alt_rounded, color: Colors.amber),
+                  onChanged: (val) => c.setSatellite(val),
+                ),
+                SwitchListTile(
+                  title: Text(
                     arabic ? 'وحدة القياس بالميل' : 'Miles (Imperial)',
                     style: TextStyle(color: textColor, fontWeight: FontWeight.w600),
                   ),

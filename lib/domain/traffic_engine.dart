@@ -30,6 +30,7 @@ class BaghdadTrafficCorridor {
     required this.severity,
     required this.congestedSpeedKmh,
     required this.delaySeconds,
+    this.pathPoints = const [],
   });
 
   final String name;
@@ -39,6 +40,7 @@ class BaghdadTrafficCorridor {
   final TrafficCongestionLevel severity;
   final double congestedSpeedKmh;
   final double delaySeconds;
+  final List<LatLng> pathPoints;
 }
 
 const baghdadTrafficCorridors = <BaghdadTrafficCorridor>[
@@ -51,6 +53,16 @@ const baghdadTrafficCorridors = <BaghdadTrafficCorridor>[
     severity: TrafficCongestionLevel.moderate,
     congestedSpeedKmh: 34,
     delaySeconds: 180, // +3 min
+    pathPoints: [
+      LatLng(33.3950, 44.3680),
+      LatLng(33.3820, 44.3780),
+      LatLng(33.3650, 44.3900),
+      LatLng(33.3480, 44.4050),
+      LatLng(33.3350, 44.4170),
+      LatLng(33.3220, 44.4280),
+      LatLng(33.3050, 44.4450),
+      LatLng(33.2880, 44.4600),
+    ],
   ),
   // 2. Al-Jadriya Bridge & Intersection (Busiest Karkh-Rusafa link)
   BaghdadTrafficCorridor(
@@ -61,6 +73,13 @@ const baghdadTrafficCorridors = <BaghdadTrafficCorridor>[
     severity: TrafficCongestionLevel.heavy,
     congestedSpeedKmh: 14,
     delaySeconds: 320, // +5.3 min
+    pathPoints: [
+      LatLng(33.2720, 44.3600),
+      LatLng(33.2750, 44.3700),
+      LatLng(33.2800, 44.3820),
+      LatLng(33.2850, 44.3950),
+      LatLng(33.2880, 44.4080),
+    ],
   ),
   // 3. Al-Jumhuriya & Al-Senak Bridges / Tahrir Square
   BaghdadTrafficCorridor(
@@ -71,6 +90,13 @@ const baghdadTrafficCorridors = <BaghdadTrafficCorridor>[
     severity: TrafficCongestionLevel.heavy,
     congestedSpeedKmh: 12,
     delaySeconds: 360, // +6 min
+    pathPoints: [
+      LatLng(33.3210, 44.3920),
+      LatLng(33.3250, 44.3980),
+      LatLng(33.3270, 44.4030),
+      LatLng(33.3290, 44.4080),
+      LatLng(33.3300, 44.4150),
+    ],
   ),
   // 4. Damascus Square & Nisour Junction (Central Karkh)
   BaghdadTrafficCorridor(
@@ -81,6 +107,12 @@ const baghdadTrafficCorridors = <BaghdadTrafficCorridor>[
     severity: TrafficCongestionLevel.moderate,
     congestedSpeedKmh: 24,
     delaySeconds: 220, // +3.6 min
+    pathPoints: [
+      LatLng(33.3260, 44.3780),
+      LatLng(33.3210, 44.3720),
+      LatLng(33.3180, 44.3700),
+      LatLng(33.3120, 44.3650),
+    ],
   ),
   // 5. 14th of Ramadan Street (Al-Mansour)
   BaghdadTrafficCorridor(
@@ -91,6 +123,12 @@ const baghdadTrafficCorridors = <BaghdadTrafficCorridor>[
     severity: TrafficCongestionLevel.moderate,
     congestedSpeedKmh: 22,
     delaySeconds: 240, // +4 min
+    pathPoints: [
+      LatLng(33.3080, 44.3620),
+      LatLng(33.3150, 44.3550),
+      LatLng(33.3220, 44.3480),
+      LatLng(33.3300, 44.3400),
+    ],
   ),
   // 6. Palestine Street (Beirut Square)
   BaghdadTrafficCorridor(
@@ -101,6 +139,13 @@ const baghdadTrafficCorridors = <BaghdadTrafficCorridor>[
     severity: TrafficCongestionLevel.moderate,
     congestedSpeedKmh: 26,
     delaySeconds: 200, // +3.3 min
+    pathPoints: [
+      LatLng(33.3650, 44.4050),
+      LatLng(33.3550, 44.4150),
+      LatLng(33.3450, 44.4250),
+      LatLng(33.3350, 44.4350),
+      LatLng(33.3250, 44.4450),
+    ],
   ),
   // 7. Al-Karrada Dakhil
   BaghdadTrafficCorridor(
@@ -111,6 +156,13 @@ const baghdadTrafficCorridors = <BaghdadTrafficCorridor>[
     severity: TrafficCongestionLevel.heavy,
     congestedSpeedKmh: 15,
     delaySeconds: 300, // +5 min
+    pathPoints: [
+      LatLng(33.3200, 44.4200),
+      LatLng(33.3100, 44.4220),
+      LatLng(33.3000, 44.4200),
+      LatLng(33.2900, 44.4120),
+      LatLng(33.2820, 44.4000),
+    ],
   ),
   // 8. Bab Al-Muadham Bridge & Medical City
   BaghdadTrafficCorridor(
@@ -121,6 +173,12 @@ const baghdadTrafficCorridors = <BaghdadTrafficCorridor>[
     severity: TrafficCongestionLevel.standstill,
     congestedSpeedKmh: 8,
     delaySeconds: 420, // +7 min
+    pathPoints: [
+      LatLng(33.3510, 44.3720),
+      LatLng(33.3550, 44.3800),
+      LatLng(33.3560, 44.3880),
+      LatLng(33.3580, 44.3950),
+    ],
   ),
   // 9. Yarmouk & Airport Road Junction
   BaghdadTrafficCorridor(
@@ -131,6 +189,14 @@ const baghdadTrafficCorridors = <BaghdadTrafficCorridor>[
     severity: TrafficCongestionLevel.moderate,
     congestedSpeedKmh: 28,
     delaySeconds: 180, // +3 min
+    pathPoints: [
+      LatLng(33.2980, 44.3650),
+      LatLng(33.2900, 44.3500),
+      LatLng(33.2820, 44.3250),
+      LatLng(33.2750, 44.3000),
+      LatLng(33.2680, 44.2750),
+      LatLng(33.2600, 44.2500),
+    ],
   ),
   // 10. Bab Al-Sharqi & Tayaran Square
   BaghdadTrafficCorridor(
@@ -141,6 +207,11 @@ const baghdadTrafficCorridors = <BaghdadTrafficCorridor>[
     severity: TrafficCongestionLevel.heavy,
     congestedSpeedKmh: 10,
     delaySeconds: 340, // +5.6 min
+    pathPoints: [
+      LatLng(33.3340, 44.4080),
+      LatLng(33.3310, 44.4150),
+      LatLng(33.3280, 44.4220),
+    ],
   ),
 ];
 

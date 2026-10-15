@@ -68,10 +68,120 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   /// Convert latlong2 LatLng to MapLibre LatLng
   LatLng _toMapLibre(ll.LatLng p) => LatLng(p.latitude, p.longitude);
 
-  /// Get the style URL based on dark mode
-  String _getStyleUrl(bool dark) {
-    // Use OpenFreeMap styles - no API key required
-    // We'll load our custom style from assets if available, otherwise use OpenFreeMap
+  static const String _satelliteStyleJson = '''
+{
+  "version": 8,
+  "name": "Darb 3D Satellite",
+  "glyphs": "https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf",
+  "sources": {
+    "openmaptiles": {
+      "type": "vector",
+      "url": "https://tiles.openfreemap.org/planet"
+    },
+    "esri-satellite": {
+      "type": "raster",
+      "tiles": [
+        "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+      ],
+      "tileSize": 256,
+      "maxzoom": 19,
+      "attribution": "Esri World Imagery"
+    },
+    "esri-transportation": {
+      "type": "raster",
+      "tiles": [
+        "https://services.arcgisonline.com/arcgis/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}"
+      ],
+      "tileSize": 256,
+      "maxzoom": 19
+    },
+    "esri-labels": {
+      "type": "raster",
+      "tiles": [
+        "https://services.arcgisonline.com/arcgis/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}"
+      ],
+      "tileSize": 256,
+      "maxzoom": 19
+    }
+  },
+  "layers": [
+    {
+      "id": "background",
+      "type": "background",
+      "paint": {
+        "background-color": "#06090e"
+      }
+    },
+    {
+      "id": "satellite-base",
+      "type": "raster",
+      "source": "esri-satellite",
+      "paint": {
+        "raster-opacity": 1.0,
+        "raster-contrast": 0.05
+      }
+    },
+    {
+      "id": "building-3d",
+      "type": "fill-extrusion",
+      "source": "openmaptiles",
+      "source-layer": "building",
+      "minzoom": 13,
+      "paint": {
+        "fill-extrusion-color": [
+          "interpolate",
+          ["linear"],
+          ["coalesce", ["get", "render_height"], ["get", "height"], 12],
+          0, "#1e293b",
+          25, "#334155",
+          50, "#475569",
+          100, "#64748b"
+        ],
+        "fill-extrusion-height": [
+          "interpolate",
+          ["linear"],
+          ["zoom"],
+          13, 0,
+          14.5, [
+            "min",
+            ["coalesce", ["get", "render_height"], ["get", "height"], 12],
+            65
+          ]
+        ],
+        "fill-extrusion-base": [
+          "coalesce",
+          ["get", "render_min_height"],
+          ["get", "min_height"],
+          0
+        ],
+        "fill-extrusion-opacity": 0.85
+      }
+    },
+    {
+      "id": "roads-overlay",
+      "type": "raster",
+      "source": "esri-transportation",
+      "paint": {
+        "raster-opacity": 0.85
+      }
+    },
+    {
+      "id": "labels-overlay",
+      "type": "raster",
+      "source": "esri-labels",
+      "paint": {
+        "raster-opacity": 0.95
+      }
+    }
+  ]
+}
+''';
+
+  /// Get the style URL or JSON based on dark mode and satellite view
+  String _getStyleUrl(bool dark, bool satellite) {
+    if (satellite) {
+      return _satelliteStyleJson;
+    }
     return dark
         ? 'https://tiles.openfreemap.org/styles/dark'
         : 'https://tiles.openfreemap.org/styles/bright';
@@ -467,7 +577,50 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         );
       }
 
-      if (c.routes.isEmpty) return;
+      if (c.routes.isEmpty) {
+        // Render Baghdad arterial corridor traffic flow lines when exploring the map
+        for (final corridor in baghdadTrafficCorridors) {
+          if (corridor.pathPoints.length < 2) continue;
+          String colorHex;
+          switch (corridor.severity) {
+            case TrafficCongestionLevel.standstill:
+              colorHex = '#FF3D00'; // Standstill red
+              break;
+            case TrafficCongestionLevel.heavy:
+              colorHex = '#FF9100'; // Heavy orange
+              break;
+            case TrafficCongestionLevel.moderate:
+              colorHex = '#FFD600'; // Moderate yellow
+              break;
+            case TrafficCongestionLevel.free:
+              colorHex = '#00E676'; // Free flow green
+              break;
+          }
+
+          final coords = corridor.pathPoints.map(_toMapLibre).toList();
+          // High-contrast casing line
+          await controller.addLine(
+            LineOptions(
+              geometry: coords,
+              lineColor: '#0A0E14',
+              lineWidth: 7.0,
+              lineOpacity: 0.75,
+              lineJoin: 'round',
+            ),
+          );
+          // Core colored traffic line
+          await controller.addLine(
+            LineOptions(
+              geometry: coords,
+              lineColor: colorHex,
+              lineWidth: 4.5,
+              lineOpacity: 0.95,
+              lineJoin: 'round',
+            ),
+          );
+        }
+        return;
+      }
 
       // 1. Render alternative routes underneath
       for (var i = 0; i < c.routes.length; i++) {
@@ -529,7 +682,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 hexColor = '#FF9500'; // Amber
                 break;
               case TrafficCongestionLevel.free:
-                hexColor = null;
+                hexColor = '#00E676'; // Vibrant green
                 break;
             }
             if (hexColor != null) {
@@ -1074,6 +1227,20 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 ),
                 const SizedBox(height: 10),
 
+                // 3D Satellite Layer Toggle Button
+                _buildCircularButton(
+                  icon: c.satellite ? Icons.satellite_alt_rounded : Icons.public_rounded,
+                  color: c.satellite ? Colors.amber : (dark ? Colors.white60 : Colors.black54),
+                  dark: dark,
+                  onPressed: () {
+                    c.setSatellite(!c.satellite);
+                    if (c.satellite && !_is3D) {
+                      _toggle3D();
+                    }
+                  },
+                ),
+                const SizedBox(height: 10),
+
                 // Zoom In
                 _buildCircularButton(
                   icon: Icons.add_rounded,
@@ -1164,7 +1331,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   /// Build the MapLibre map widget
   Widget _buildMapWidget(AppController c, bool dark) {
-    final styleUrl = _getStyleUrl(dark);
+    final styleUrl = _getStyleUrl(dark, c.satellite);
 
     return Listener(
       onPointerMove: (e) {
@@ -1175,10 +1342,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         }
       },
       child: MapLibreMap(
+        key: ValueKey('maplibre_${c.satellite}_$dark'),
         styleString: styleUrl,
         initialCameraPosition: CameraPosition(
           target: _toMapLibre(c.position),
-          zoom: 15.0,
+          zoom: c.satellite ? 16.5 : 15.0,
+          tilt: _is3D ? 60.0 : 0.0,
+          bearing: _headingUp && c.navigating ? c.heading : 0.0,
         ),
         onMapCreated: _onMapCreated,
         onStyleLoadedCallback: _onStyleLoaded,

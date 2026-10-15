@@ -138,13 +138,13 @@ app.MapGet("/api/auth/verify", (HttpContext ctx) =>
 // App version & update info endpoint (100% Public)
 app.MapGet("/api/app/version", () => Results.Ok(new
 {
-    versionCode = 4,
-    versionName = "1.0.4",
+    versionCode = 5,
+    versionName = "1.0.5",
     apkUrl = "http://139.185.47.123:5000/darb.apk",
-    apkSizeBytes = 86590823,
+    apkSizeBytes = 86608488,
     publishedAt = DateTime.UtcNow,
-    releaseNotesAr = "دعم كامل للملاحة والبحث الصوتي عبر شاشة السيارة Android Auto، وتحسين الاستماع للجمل الطويلة دون انقطاع",
-    releaseNotesEn = "Full Android Auto native voice navigation support and sentence listening enhancement"
+    releaseNotesAr = "عرض القمر الصناعي ثلاثي الأبعاد مدمج مع المباني ثلاثية الأبعاد (3D Buildings) وعرض خطوط حركة المرور الحية في لوحة التحكم والتطبيق",
+    releaseNotesEn = "Combined 3D Satellite view with extruded 3D buildings and live traffic flow lines on dashboard and app"
 }))
 .WithName("GetAppVersion");
 
@@ -611,7 +611,9 @@ app.MapGet("/api/dashboard/stats", async (
             a.Latitude,
             a.Longitude,
             a.AverageSpeedKmh,
+            a.NormalSpeedKmh,
             a.CongestionLevel,
+            a.DelaySeconds,
             SamplesCount = a.SampleCount,
             a.UpdatedAt
         })
