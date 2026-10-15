@@ -72,6 +72,9 @@ class RoadReport {
     this.description = '',
     this.demo = false,
     this.confirmations = 0,
+    this.userId,
+    this.isVerified = false,
+    this.isRoadWarning = false,
   });
 
   final String id;
@@ -82,10 +85,41 @@ class RoadReport {
   final String description;
   final bool demo;
   final int confirmations;
+  final String? userId;
+  final bool isVerified;
+  final bool isRoadWarning;
 
   bool get isActive {
     final now = DateTime.now();
     return !createdAt.isAfter(now) && expiresAt.isAfter(now);
+  }
+
+  RoadReport copyWith({
+    String? id,
+    ReportType? type,
+    LatLng? point,
+    DateTime? createdAt,
+    DateTime? expiresAt,
+    String? description,
+    bool? demo,
+    int? confirmations,
+    String? userId,
+    bool? isVerified,
+    bool? isRoadWarning,
+  }) {
+    return RoadReport(
+      id: id ?? this.id,
+      type: type ?? this.type,
+      point: point ?? this.point,
+      createdAt: createdAt ?? this.createdAt,
+      expiresAt: expiresAt ?? this.expiresAt,
+      description: description ?? this.description,
+      demo: demo ?? this.demo,
+      confirmations: confirmations ?? this.confirmations,
+      userId: userId ?? this.userId,
+      isVerified: isVerified ?? this.isVerified,
+      isRoadWarning: isRoadWarning ?? this.isRoadWarning,
+    );
   }
 
   Map<String, dynamic> toJson() => {
@@ -98,11 +132,17 @@ class RoadReport {
     'description': description,
     'demo': demo,
     'confirmations': confirmations,
+    if (userId != null) 'userId': userId,
+    'isVerified': isVerified,
+    'isRoadWarning': isRoadWarning,
   };
 
   factory RoadReport.fromJson(Map<String, dynamic> json) => RoadReport(
     id: json['id'] as String,
-    type: ReportType.values.byName(json['type'] as String),
+    type: ReportType.values.firstWhere(
+      (value) => value.name == (json['type']?.toString().toLowerCase()),
+      orElse: () => ReportType.hazard,
+    ),
     point: _pointFromJson(json),
     createdAt: DateTime.parse(
       (json['createdAt'] ?? json['created_at']) as String,
@@ -113,6 +153,9 @@ class RoadReport {
     description: (json['description'] ?? '') as String,
     demo: (json['demo'] ?? false) as bool,
     confirmations: (json['confirmations'] as num?)?.toInt() ?? 0,
+    userId: json['userId'] as String?,
+    isVerified: json['isVerified'] == true,
+    isRoadWarning: json['isRoadWarning'] == true,
   );
 }
 

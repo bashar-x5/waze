@@ -9,9 +9,14 @@ public interface ITrafficIntelligenceService
     Task<(bool Success, string? Error)> IngestObservationAsync(GpsObservationDto dto, CancellationToken cancellationToken = default);
     Task<List<TrafficConditionDto>> GetConditionsAsync(double? minLon, double? minLat, double? maxLon, double? maxLat, CancellationToken cancellationToken = default);
     Task<TrafficIncidentDto> ReportIncidentAsync(TrafficIncidentDto dto, CancellationToken cancellationToken = default);
-    Task<bool> ConfirmIncidentAsync(string incidentId, CancellationToken cancellationToken = default);
+    Task<bool> ConfirmIncidentAsync(string incidentId, string? userId = null, CancellationToken cancellationToken = default);
     Task<List<TrafficIncidentDto>> GetIncidentsAsync(double? minLon, double? minLat, double? maxLon, double? maxLat, CancellationToken cancellationToken = default);
     Task AggregateTrafficAsync(CancellationToken cancellationToken = default);
+    Task<List<DarbUserDto>> GetUsersAsync(CancellationToken cancellationToken = default);
+    Task<bool> ToggleUserBlockAsync(string userId, CancellationToken cancellationToken = default);
+    Task<bool> ToggleUserTrustAsync(string userId, CancellationToken cancellationToken = default);
+    Task<bool> DeleteIncidentAsync(string incidentId, CancellationToken cancellationToken = default);
+    Task<bool> VerifyIncidentAsWarningAsync(string incidentId, CancellationToken cancellationToken = default);
 }
 
 public class TrafficIntelligenceService : ITrafficIntelligenceService
@@ -56,6 +61,34 @@ public class TrafficIntelligenceService : ITrafficIntelligenceService
             if (recentCount > 0)
             {
                 return (false, "Submission rate limit exceeded. Please wait.");
+            }
+
+            // Track user device in DarbUser table
+            var user = await _db.Users.FindAsync([dto.SessionId], cancellationToken);
+            if (user == null)
+            {
+                user = new DarbUser
+                {
+                    UserId = dto.SessionId,
+                    FirstSeenAt = now,
+                    LastSeenAt = now,
+                    Status = "active",
+                    LastLatitude = dto.Latitude,
+                    LastLongitude = dto.Longitude,
+                    LastSpeedKmh = dto.SpeedKmh
+                };
+                _db.Users.Add(user);
+            }
+            else
+            {
+                if (user.Status == "blocked")
+                {
+                    return (false, "User device is blocked.");
+                }
+                user.LastSeenAt = now;
+                user.LastLatitude = dto.Latitude;
+                user.LastLongitude = dto.Longitude;
+                user.LastSpeedKmh = dto.SpeedKmh;
             }
         }
 
@@ -109,19 +142,129 @@ public class TrafficIntelligenceService : ITrafficIntelligenceService
 
     public async Task<TrafficIncidentDto> ReportIncidentAsync(TrafficIncidentDto dto, CancellationToken cancellationToken = default)
     {
+        var rawType = dto.Type?.Trim().ToLowerInvariant() ?? "traffic";
+        var isBumpReport = rawType == "bump" ||
+            (!string.IsNullOrEmpty(dto.Description) && (
+                dto.Description.Contains("pump", StringComparison.OrdinalIgnoreCase) ||
+                dto.Description.Contains("bump", StringComparison.OrdinalIgnoreCase) ||
+                dto.Description.Contains("طسة", StringComparison.OrdinalIgnoreCase) ||
+                dto.Description.Contains("طسه", StringComparison.OrdinalIgnoreCase) ||
+                dto.Description.Contains("مطب", StringComparison.OrdinalIgnoreCase)
+            ));
+
+        var type = isBumpReport ? "bump" : rawType;
+        var now = DateTime.UtcNow;
+
+        // User tracking and status verification
+        var isTrustedUser = false;
+        if (!string.IsNullOrEmpty(dto.UserId))
+        {
+            var user = await _db.Users.FindAsync([dto.UserId], cancellationToken);
+            if (user == null)
+            {
+                user = new DarbUser
+                {
+                    UserId = dto.UserId,
+                    FirstSeenAt = now,
+                    LastSeenAt = now,
+                    ReportCount = 1,
+                    Status = "active",
+                    LastLatitude = dto.Latitude,
+                    LastLongitude = dto.Longitude
+                };
+                _db.Users.Add(user);
+            }
+            else
+            {
+                if (user.Status == "blocked")
+                {
+                    throw new InvalidOperationException("User device is blocked.");
+                }
+                user.ReportCount++;
+                user.LastSeenAt = now;
+                user.LastLatitude = dto.Latitude;
+                user.LastLongitude = dto.Longitude;
+                if (user.Status == "trusted") isTrustedUser = true;
+            }
+        }
+
         var incident = new TrafficIncident
         {
             Id = Guid.NewGuid().ToString("N")[..12],
-            Type = dto.Type.ToLowerInvariant(),
+            Type = type,
             Latitude = dto.Latitude,
             Longitude = dto.Longitude,
             Description = dto.Description?.Trim() ?? "",
-            CreatedAt = DateTime.UtcNow,
-            ExpiresAt = DateTime.UtcNow.AddHours(1),
-            Confirmations = 1
+            CreatedAt = now,
+            ExpiresAt = now.AddHours(isBumpReport ? 24 : 1),
+            Confirmations = 1,
+            UserId = dto.UserId,
+            IsVerified = isTrustedUser,
+            IsRoadWarning = isTrustedUser && isBumpReport
         };
 
+        // 3-Users Speed Bump / Warning Rule:
+        // If 3 users report pump/bump in the same place with different times it should be saved as warning in the map
+        if (isBumpReport)
+        {
+            const double thresholdDeg = 0.00065; // ~70 meters
+            var nearbyBumps = await _db.TrafficIncidents
+                .Where(i => i.Type == "bump" &&
+                            Math.Abs(i.Latitude - dto.Latitude) < thresholdDeg &&
+                            Math.Abs(i.Longitude - dto.Longitude) < thresholdDeg)
+                .ToListAsync(cancellationToken);
+
+            var reportingUsers = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            if (!string.IsNullOrEmpty(dto.UserId)) reportingUsers.Add(dto.UserId);
+
+            foreach (var nb in nearbyBumps)
+            {
+                if (!string.IsNullOrEmpty(nb.UserId)) reportingUsers.Add(nb.UserId);
+                var confs = await _db.IncidentConfirmations
+                    .Where(c => c.IncidentId == nb.Id)
+                    .Select(c => c.UserId)
+                    .ToListAsync(cancellationToken);
+                foreach (var cu in confs)
+                {
+                    if (!string.IsNullOrEmpty(cu)) reportingUsers.Add(cu);
+                }
+            }
+
+            var distinctUserCount = Math.Max(reportingUsers.Count, nearbyBumps.Count + 1);
+
+            if (distinctUserCount >= 3)
+            {
+                incident.IsVerified = true;
+                incident.IsRoadWarning = true;
+                incident.ExpiresAt = now.AddDays(90); // Long-term saved road warning
+                incident.Confirmations = distinctUserCount;
+                if (string.IsNullOrWhiteSpace(incident.Description) || !incident.Description.Contains("مطب"))
+                {
+                    incident.Description = "⚠️ مطب اصطناعي معتمد (تأكيد 3 سائقين) | Verified Speed Bump";
+                }
+
+                foreach (var nb in nearbyBumps)
+                {
+                    nb.IsVerified = true;
+                    nb.IsRoadWarning = true;
+                    nb.ExpiresAt = incident.ExpiresAt;
+                }
+                _logger.LogInformation("Speed bump cluster at {Lat},{Lon} reached {Count} unique users. Saved as road warning.", dto.Latitude, dto.Longitude, distinctUserCount);
+            }
+        }
+
         _db.TrafficIncidents.Add(incident);
+
+        if (!string.IsNullOrEmpty(dto.UserId))
+        {
+            _db.IncidentConfirmations.Add(new IncidentConfirmation
+            {
+                IncidentId = incident.Id,
+                UserId = dto.UserId,
+                ConfirmedAt = now
+            });
+        }
+
         await _db.SaveChangesAsync(cancellationToken);
 
         return new TrafficIncidentDto
@@ -133,22 +276,84 @@ public class TrafficIntelligenceService : ITrafficIntelligenceService
             Description = incident.Description,
             CreatedAt = incident.CreatedAt,
             ExpiresAt = incident.ExpiresAt,
-            Confirmations = incident.Confirmations
+            Confirmations = incident.Confirmations,
+            IsVerified = incident.IsVerified,
+            IsRoadWarning = incident.IsRoadWarning,
+            UserId = incident.UserId
         };
     }
 
-    public async Task<bool> ConfirmIncidentAsync(string incidentId, CancellationToken cancellationToken = default)
+    public async Task<bool> ConfirmIncidentAsync(string incidentId, string? userId = null, CancellationToken cancellationToken = default)
     {
         var incident = await _db.TrafficIncidents.FindAsync([incidentId], cancellationToken);
         if (incident == null || incident.ExpiresAt < DateTime.UtcNow) return false;
 
-        incident.Confirmations++;
-        incident.LastConfirmedAt = DateTime.UtcNow;
-        incident.ExpiresAt = DateTime.UtcNow.AddHours(1); // Extend lifetime on confirmation
+        var now = DateTime.UtcNow;
 
-        if (incident.Confirmations >= 3)
+        if (!string.IsNullOrEmpty(userId))
         {
-            incident.IsVerified = true;
+            var user = await _db.Users.FindAsync([userId], cancellationToken);
+            if (user != null && user.Status == "blocked") return false;
+
+            var alreadyConfirmed = await _db.IncidentConfirmations
+                .AnyAsync(c => c.IncidentId == incidentId && c.UserId == userId, cancellationToken);
+
+            if (!alreadyConfirmed)
+            {
+                _db.IncidentConfirmations.Add(new IncidentConfirmation
+                {
+                    IncidentId = incidentId,
+                    UserId = userId,
+                    ConfirmedAt = now
+                });
+                incident.Confirmations++;
+                if (user != null)
+                {
+                    user.ConfirmationCount++;
+                    user.LastSeenAt = now;
+                }
+            }
+        }
+        else
+        {
+            incident.Confirmations++;
+        }
+
+        incident.LastConfirmedAt = now;
+
+        // Check if 3 users rule reached for bumps or general incidents
+        if (incident.Type == "bump")
+        {
+            var totalUniqueUsers = await _db.IncidentConfirmations
+                .Where(c => c.IncidentId == incidentId)
+                .Select(c => c.UserId)
+                .Distinct()
+                .CountAsync(cancellationToken);
+
+            if (!string.IsNullOrEmpty(incident.UserId)) totalUniqueUsers++;
+
+            if (totalUniqueUsers >= 3 || incident.Confirmations >= 3)
+            {
+                incident.IsVerified = true;
+                incident.IsRoadWarning = true;
+                incident.ExpiresAt = now.AddDays(90);
+                if (string.IsNullOrWhiteSpace(incident.Description) || !incident.Description.Contains("مطب"))
+                {
+                    incident.Description = "⚠️ مطب اصطناعي معتمد (تأكيد 3 سائقين) | Verified Speed Bump";
+                }
+            }
+            else
+            {
+                incident.ExpiresAt = now.AddHours(2);
+            }
+        }
+        else
+        {
+            if (incident.Confirmations >= 3)
+            {
+                incident.IsVerified = true;
+            }
+            incident.ExpiresAt = now.AddHours(1);
         }
 
         await _db.SaveChangesAsync(cancellationToken);
@@ -170,8 +375,9 @@ public class TrafficIntelligenceService : ITrafficIntelligenceService
         }
 
         var list = await query
-            .OrderByDescending(i => i.CreatedAt)
-            .Take(100)
+            .OrderByDescending(i => i.IsRoadWarning)
+            .ThenByDescending(i => i.CreatedAt)
+            .Take(150)
             .ToListAsync(cancellationToken);
 
         return list.Select(i => new TrafficIncidentDto
@@ -183,8 +389,96 @@ public class TrafficIntelligenceService : ITrafficIntelligenceService
             Description = i.Description,
             CreatedAt = i.CreatedAt,
             ExpiresAt = i.ExpiresAt,
-            Confirmations = i.Confirmations
+            Confirmations = i.Confirmations,
+            IsVerified = i.IsVerified,
+            IsRoadWarning = i.IsRoadWarning,
+            UserId = i.UserId
         }).ToList();
+    }
+
+    public async Task<List<DarbUserDto>> GetUsersAsync(CancellationToken cancellationToken = default)
+    {
+        var users = await _db.Users
+            .AsNoTracking()
+            .OrderByDescending(u => u.LastSeenAt)
+            .Take(100)
+            .ToListAsync(cancellationToken);
+
+        return users.Select(u => new DarbUserDto
+        {
+            UserId = u.UserId,
+            FirstSeenAt = u.FirstSeenAt,
+            LastSeenAt = u.LastSeenAt,
+            ReportCount = u.ReportCount,
+            ConfirmationCount = u.ConfirmationCount,
+            Status = u.Status,
+            LastLatitude = u.LastLatitude,
+            LastLongitude = u.LastLongitude,
+            LastSpeedKmh = u.LastSpeedKmh
+        }).ToList();
+    }
+
+    public async Task<bool> ToggleUserBlockAsync(string userId, CancellationToken cancellationToken = default)
+    {
+        var user = await _db.Users.FindAsync([userId], cancellationToken);
+        if (user == null)
+        {
+            user = new DarbUser { UserId = userId, Status = "blocked" };
+            _db.Users.Add(user);
+        }
+        else
+        {
+            user.Status = (user.Status == "blocked") ? "active" : "blocked";
+        }
+        await _db.SaveChangesAsync(cancellationToken);
+        return true;
+    }
+
+    public async Task<bool> ToggleUserTrustAsync(string userId, CancellationToken cancellationToken = default)
+    {
+        var user = await _db.Users.FindAsync([userId], cancellationToken);
+        if (user == null)
+        {
+            user = new DarbUser { UserId = userId, Status = "trusted" };
+            _db.Users.Add(user);
+        }
+        else
+        {
+            user.Status = (user.Status == "trusted") ? "active" : "trusted";
+        }
+        await _db.SaveChangesAsync(cancellationToken);
+        return true;
+    }
+
+    public async Task<bool> DeleteIncidentAsync(string incidentId, CancellationToken cancellationToken = default)
+    {
+        var incident = await _db.TrafficIncidents.FindAsync([incidentId], cancellationToken);
+        if (incident == null) return false;
+
+        _db.TrafficIncidents.Remove(incident);
+        var confs = await _db.IncidentConfirmations
+            .Where(c => c.IncidentId == incidentId)
+            .ToListAsync(cancellationToken);
+        _db.IncidentConfirmations.RemoveRange(confs);
+
+        await _db.SaveChangesAsync(cancellationToken);
+        return true;
+    }
+
+    public async Task<bool> VerifyIncidentAsWarningAsync(string incidentId, CancellationToken cancellationToken = default)
+    {
+        var incident = await _db.TrafficIncidents.FindAsync([incidentId], cancellationToken);
+        if (incident == null) return false;
+
+        incident.IsVerified = true;
+        incident.IsRoadWarning = true;
+        incident.ExpiresAt = DateTime.UtcNow.AddDays(90);
+        if (string.IsNullOrWhiteSpace(incident.Description) || !incident.Description.Contains("مطب"))
+        {
+            incident.Description = "⚠️ مطب اصطناعي معتمد | Verified Road Warning";
+        }
+        await _db.SaveChangesAsync(cancellationToken);
+        return true;
     }
 
     public async Task AggregateTrafficAsync(CancellationToken cancellationToken = default)

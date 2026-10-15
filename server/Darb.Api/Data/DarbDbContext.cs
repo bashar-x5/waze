@@ -10,6 +10,8 @@ public class DarbDbContext : DbContext
     public DbSet<GpsObservation> GpsObservations => Set<GpsObservation>();
     public DbSet<RoadTrafficAggregate> RoadTrafficAggregates => Set<RoadTrafficAggregate>();
     public DbSet<TrafficIncident> TrafficIncidents => Set<TrafficIncident>();
+    public DbSet<DarbUser> Users => Set<DarbUser>();
+    public DbSet<IncidentConfirmation> IncidentConfirmations => Set<IncidentConfirmation>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -36,7 +38,22 @@ public class DarbDbContext : DbContext
             b.HasKey(e => e.Id);
             b.HasIndex(e => e.Type);
             b.HasIndex(e => e.ExpiresAt);
+            b.HasIndex(e => e.UserId);
+            b.HasIndex(e => e.IsRoadWarning);
             b.HasIndex(e => new { e.Latitude, e.Longitude });
+        });
+
+        modelBuilder.Entity<DarbUser>(b =>
+        {
+            b.HasKey(e => e.UserId);
+            b.HasIndex(e => e.LastSeenAt);
+            b.HasIndex(e => e.Status);
+        });
+
+        modelBuilder.Entity<IncidentConfirmation>(b =>
+        {
+            b.HasKey(e => e.Id);
+            b.HasIndex(e => new { e.IncidentId, e.UserId }).IsUnique();
         });
     }
 

@@ -29,8 +29,9 @@ class AppController extends ChangeNotifier {
   final RoutingService _routing;
   final PlaceSearchService _search;
   final DarbApiService _api;
-  String _sessionId = 'usr_${Random().nextInt(0xFFFFFF).toRadixString(16).padLeft(6, '0').toUpperCase()}';
+  String _sessionId = 'MAC-${Random().nextInt(0xFFFFFF).toRadixString(16).padLeft(6, '0').toUpperCase()}';
   final Set<String> _spokenManeuverSignatures = {};
+  final Set<String> _announcedWarningIds = {};
   String? _lastSpokenPhrase;
   DateTime? _lastSpokenTimestamp;
   DateTime? _lastGpsObservationSent;
@@ -41,6 +42,9 @@ class AppController extends ChangeNotifier {
   StreamSubscription<List<RoadReport>>? _reportStream;
   Timer? _simulation;
   Timer? _expiry;
+  Timer? _serverIncidentsTimer;
+
+  String get userId => _sessionId;
   bool _disposed = false;
   int _routeRequest = 0;
   int _searchRequest = 0;
@@ -113,7 +117,7 @@ class AppController extends ChangeNotifier {
           6,
           (_) => rand.nextInt(256).toRadixString(16).padLeft(2, '0'),
         ).join(':').toUpperCase();
-        _sessionId = 'usr_$macLike';
+        _sessionId = 'MAC-$macLike';
         unawaited(_prefs!.setString('darb.device_user_id.v1', _sessionId));
       }
       final raw = _prefs!.getString('darb.preferences.v1');
@@ -152,6 +156,10 @@ class AppController extends ChangeNotifier {
       localReports.removeWhere((r) => !r.isActive);
       _emit();
     });
+    _serverIncidentsTimer = Timer.periodic(const Duration(seconds: 15), (_) {
+      unawaited(fetchServerIncidents());
+    });
+    unawaited(fetchServerIncidents());
     unawaited(locate());
   }
 
@@ -596,8 +604,55 @@ class AppController extends ChangeNotifier {
       } else {
         _offRouteSamples = 0;
       }
+      _checkRouteAlerts(current, p);
     }
     _emit();
+  }
+
+  void _checkRouteAlerts(DriveRoute currentRoute, NavigationProgress p) {
+    if (!voice) return;
+    const alertDistanceMeters = 380.0;
+    const distCalc = Distance();
+
+    for (final rep in reports) {
+      if (!rep.isActive) continue;
+      // Alert for bumps, road warnings, hazards, cameras, and crashes ahead
+      if (rep.type != ReportType.bump &&
+          !rep.isRoadWarning &&
+          rep.type != ReportType.hazard &&
+          rep.type != ReportType.camera &&
+          rep.type != ReportType.crash) {
+        continue;
+      }
+
+      final metersAway = distCalc.as(LengthUnit.Meter, position, rep.point);
+      if (metersAway <= alertDistanceMeters && metersAway >= 35) {
+        final alertKey = '${rep.id}_${rep.type.name}';
+        if (!_announcedWarningIds.contains(alertKey)) {
+          _announcedWarningIds.add(alertKey);
+          String warningMsg;
+          if (rep.type == ReportType.bump || rep.isRoadWarning) {
+            warningMsg = arabic
+                ? 'انتبه: مطب اصطناعي بعد ${(metersAway).round()} متر'
+                : 'Caution: Speed bump ahead in ${(metersAway).round()} meters';
+          } else if (rep.type == ReportType.camera) {
+            warningMsg = arabic
+                ? 'انتبه: رادار مراقبة سرعة أمامك'
+                : 'Caution: Speed camera ahead';
+          } else if (rep.type == ReportType.crash) {
+            warningMsg = arabic
+                ? 'انتبه: حادث سير أمامك'
+                : 'Caution: Traffic accident ahead';
+          } else {
+            warningMsg = arabic
+                ? 'انتبه: خطر على الطريق أمامك'
+                : 'Caution: Road hazard ahead';
+          }
+          _speak(warningMsg);
+          notice = '⚠️ $warningMsg';
+        }
+      }
+    }
   }
 
   Future<void> _speak(String text, {bool force = false}) async {
@@ -691,39 +746,93 @@ class AppController extends ChangeNotifier {
       if (!await locate()) return;
     }
     final now = DateTime.now();
-    final report = RoadReport(id: _id('report'), type: type, point: position,
-      createdAt: now, expiresAt: now.add(const Duration(hours: 1)),
-      description: description.trim(), demo: demoMode);
+    final isBump = type == ReportType.bump;
+    final report = RoadReport(
+      id: _id('report'),
+      type: type,
+      point: position,
+      createdAt: now,
+      expiresAt: now.add(Duration(hours: isBump ? 24 : 1)),
+      description: description.trim(),
+      demo: demoMode,
+      userId: _sessionId,
+    );
+
     if (sharing && !demoMode) {
-      unawaited(_api.reportIncident(report));
-      try { await _community.submit(report); }
-      catch (_) {
-        localReports.insert(0, report); _save();
-        error = tr('Saved on this device. Publishing failed; this report is not shared.',
-          'تم الحفظ على هذا الجهاز. فشل النشر؛ البلاغ غير مشارك.'); _emit(); return;
-      }
+      unawaited(_api.reportIncident(report, userId: _sessionId).then((_) {
+        unawaited(fetchServerIncidents());
+      }));
+      try { await _community.submit(report); } catch (_) {}
     } else {
       if (!demoMode) {
-        unawaited(_api.reportIncident(report));
+        unawaited(_api.reportIncident(report, userId: _sessionId).then((_) {
+          unawaited(fetchServerIncidents());
+        }));
       }
-      localReports.insert(0, report);
     }
-    notice = demoMode ? tr('Demo report added.', 'تمت إضافة بلاغ تجريبي.')
-      : sharing ? tr('Report shared with nearby drivers.', 'تمت مشاركة البلاغ مع السائقين القريبين.')
-      : tr('Report saved on this device only.', 'تم حفظ البلاغ على هذا الجهاز فقط.');
-    _save(); _emit();
+    localReports.insert(0, report);
+    notice = demoMode
+        ? tr('Demo report added.', 'تمت إضافة بلاغ تجريبي.')
+        : tr('Report shared with nearby drivers.', 'تمت مشاركة البلاغ مع السائقين القريبين.');
+    _save();
+    _emit();
   }
 
   Future<void> confirmReport(RoadReport report) async {
     if (confirmed.contains(report.id)) return;
+    confirmed.add(report.id);
+
+    // Update locally in sharedReports or localReports immediately
+    final sharedIdx = sharedReports.indexWhere((r) => r.id == report.id);
+    if (sharedIdx >= 0) {
+      sharedReports[sharedIdx] = sharedReports[sharedIdx].copyWith(
+        confirmations: sharedReports[sharedIdx].confirmations + 1,
+      );
+    }
+    final localIdx = localReports.indexWhere((r) => r.id == report.id);
+    if (localIdx >= 0) {
+      localReports[localIdx] = localReports[localIdx].copyWith(
+        confirmations: localReports[localIdx].confirmations + 1,
+      );
+    }
+
     if (!demoMode) {
-      unawaited(_api.confirmIncident(report.id));
+      unawaited(_api.confirmIncident(report.id, userId: _sessionId).then((_) {
+        unawaited(fetchServerIncidents());
+      }));
     }
     if (sharedReports.any((r) => r.id == report.id) && sharing) {
-      try { await _community.confirm(report.id); }
-      catch (_) { error = tr('Could not confirm the report.', 'تعذر تأكيد البلاغ.'); _emit(); return; }
+      try { await _community.confirm(report.id); } catch (_) {}
     }
-    confirmed.add(report.id); _emit();
+    notice = tr('Report confirmed (+1).', 'تم تأكيد البلاغ بنجاح (+1).');
+    _save();
+    _emit();
+  }
+
+  /// Fetches live crowdsourced reports from the self-hosted Darb server.
+  Future<void> fetchServerIncidents() async {
+    if (demoMode) return;
+    try {
+      final incidents = await _api.fetchIncidents(center: position, radiusDeg: 0.5);
+      if (incidents.isNotEmpty) {
+        final activeServerReports = incidents.where((r) => r.isActive).toList();
+        final localIds = localReports.map((r) => r.id).toSet();
+        sharedReports = activeServerReports.where((r) => !localIds.contains(r.id)).toList();
+
+        for (final serverRep in activeServerReports) {
+          final lIdx = localReports.indexWhere((r) => r.id == serverRep.id);
+          if (lIdx >= 0) {
+            localReports[lIdx] = localReports[lIdx].copyWith(
+              confirmations: serverRep.confirmations,
+              isVerified: serverRep.isVerified,
+              isRoadWarning: serverRep.isRoadWarning,
+              expiresAt: serverRep.expiresAt,
+            );
+          }
+        }
+        _emit();
+      }
+    } catch (_) {}
   }
 
   Future<void> setSharing(bool value) async {
@@ -778,6 +887,7 @@ class AppController extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true; _routeRequest++; _searchRequest++;
+    _serverIncidentsTimer?.cancel();
     _simulation?.cancel(); _expiry?.cancel(); _gps?.cancel(); _reportStream?.cancel();
     _tts?.stop(); _community.dispose(); _routing.dispose(); _search.dispose();
     _api.dispose();

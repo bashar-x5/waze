@@ -244,4 +244,181 @@ public class TrafficIntelligenceServiceTests
             Assert.False(oldExists);
         }
     }
+
+    [Fact]
+    public async Task ReportIncident_ThreeUsersReportingBump_AutomaticallyCreatesVerifiedRoadWarning()
+    {
+        var (db, conn) = CreateContext();
+        using (conn)
+        using (db)
+        {
+            var service = new TrafficIntelligenceService(db, NullLogger<TrafficIntelligenceService>.Instance);
+
+            const double lat = 33.3152;
+            const double lon = 44.3661;
+
+            // User 1 reports pump/bump
+            var r1 = await service.ReportIncidentAsync(new TrafficIncidentDto
+            {
+                Type = "bump",
+                Latitude = lat,
+                Longitude = lon,
+                Description = "طسة قوية",
+                UserId = "MAC-11:22:33:44:55:01"
+            });
+            Assert.False(r1.IsVerified);
+            Assert.False(r1.IsRoadWarning);
+
+            // User 2 reports bump in same location (within 20 meters)
+            var r2 = await service.ReportIncidentAsync(new TrafficIncidentDto
+            {
+                Type = "bump",
+                Latitude = lat + 0.0001,
+                Longitude = lon + 0.0001,
+                Description = "مطب جديد",
+                UserId = "MAC-11:22:33:44:55:02"
+            });
+            Assert.False(r2.IsVerified);
+
+            // User 3 reports bump in same location at different time
+            var r3 = await service.ReportIncidentAsync(new TrafficIncidentDto
+            {
+                Type = "bump",
+                Latitude = lat + 0.00005,
+                Longitude = lon,
+                Description = "pump warning",
+                UserId = "MAC-11:22:33:44:55:03"
+            });
+
+            // 3rd user report triggers automated road warning verification!
+            Assert.True(r3.IsVerified);
+            Assert.True(r3.IsRoadWarning);
+            Assert.Contains("مطب اصطناعي معتمد", r3.Description);
+            Assert.True(r3.ExpiresAt > DateTime.UtcNow.AddDays(30)); // 90 days persistent warning
+        }
+    }
+
+    [Fact]
+    public async Task ConfirmIncident_DistinctUsers_IncrementCountAndPreventDuplicates()
+    {
+        var (db, conn) = CreateContext();
+        using (conn)
+        using (db)
+        {
+            var service = new TrafficIntelligenceService(db, NullLogger<TrafficIntelligenceService>.Instance);
+
+            var incident = await service.ReportIncidentAsync(new TrafficIncidentDto
+            {
+                Type = "police",
+                Latitude = 33.3152,
+                Longitude = 44.3661,
+                Description = "سيطرة تفتيش",
+                UserId = "MAC-AA:BB:CC:00:11:01"
+            });
+            Assert.Equal(1, incident.Confirmations);
+
+            // User 2 confirms
+            var conf1 = await service.ConfirmIncidentAsync(incident.Id!, "MAC-AA:BB:CC:00:11:02");
+            Assert.True(conf1);
+
+            var list = await service.GetIncidentsAsync(44.0, 33.0, 45.0, 34.0);
+            Assert.Equal(2, list.First(i => i.Id == incident.Id).Confirmations);
+
+            // User 2 tries to confirm again -> should NOT double count
+            var confDuplicate = await service.ConfirmIncidentAsync(incident.Id!, "MAC-AA:BB:CC:00:11:02");
+            Assert.True(confDuplicate);
+
+            list = await service.GetIncidentsAsync(44.0, 33.0, 45.0, 34.0);
+            Assert.Equal(2, list.First(i => i.Id == incident.Id).Confirmations); // Still 2
+
+            // User 3 confirms -> increments to 3 and verifies!
+            var conf3 = await service.ConfirmIncidentAsync(incident.Id!, "MAC-AA:BB:CC:00:11:03");
+            Assert.True(conf3);
+
+            list = await service.GetIncidentsAsync(44.0, 33.0, 45.0, 34.0);
+            var updated = list.First(i => i.Id == incident.Id);
+            Assert.Equal(3, updated.Confirmations);
+            Assert.True(updated.IsVerified);
+        }
+    }
+
+    [Fact]
+    public async Task AdminControls_BlockAndTrustUsers_EnforcesPermissions()
+    {
+        var (db, conn) = CreateContext();
+        using (conn)
+        using (db)
+        {
+            var service = new TrafficIntelligenceService(db, NullLogger<TrafficIntelligenceService>.Instance);
+            var testUser = "MAC-99:88:77:66:55:44";
+
+            // Toggle block user
+            await service.ToggleUserBlockAsync(testUser);
+            var users = await service.GetUsersAsync();
+            var user = users.First(u => u.UserId == testUser);
+            Assert.Equal("blocked", user.Status);
+
+            // Blocked user attempting to report should fail
+            await Assert.ThrowsAsync<InvalidOperationException>(() => service.ReportIncidentAsync(new TrafficIncidentDto
+            {
+                Type = "crash",
+                Latitude = 33.3152,
+                Longitude = 44.3661,
+                UserId = testUser
+            }));
+
+            // Unblock and trust user
+            await service.ToggleUserBlockAsync(testUser); // unblocked to active
+            await service.ToggleUserTrustAsync(testUser); // trusted
+            users = await service.GetUsersAsync();
+            user = users.First(u => u.UserId == testUser);
+            Assert.Equal("trusted", user.Status);
+
+            // Trusted user report is automatically verified
+            var trustedReport = await service.ReportIncidentAsync(new TrafficIncidentDto
+            {
+                Type = "traffic",
+                Latitude = 33.3152,
+                Longitude = 44.3661,
+                UserId = testUser
+            });
+            Assert.True(trustedReport.IsVerified);
+        }
+    }
+
+    [Fact]
+    public async Task AdminControls_DeleteAndVerifyRoadWarning_WorkCorrectly()
+    {
+        var (db, conn) = CreateContext();
+        using (conn)
+        using (db)
+        {
+            var service = new TrafficIntelligenceService(db, NullLogger<TrafficIntelligenceService>.Instance);
+
+            var incident = await service.ReportIncidentAsync(new TrafficIncidentDto
+            {
+                Type = "hazard",
+                Latitude = 33.3152,
+                Longitude = 44.3661,
+                Description = "حفرة عميقة",
+                UserId = "MAC-12:34:56:78:90:AB"
+            });
+
+            // Verify manually as road warning
+            var verifyRes = await service.VerifyIncidentAsWarningAsync(incident.Id!);
+            Assert.True(verifyRes);
+
+            var incidents = await service.GetIncidentsAsync(44.0, 33.0, 45.0, 34.0);
+            var verified = incidents.First(i => i.Id == incident.Id);
+            Assert.True(verified.IsVerified);
+            Assert.True(verified.IsRoadWarning);
+
+            // Delete incident
+            var deleteRes = await service.DeleteIncidentAsync(incident.Id!);
+            Assert.True(deleteRes);
+
+            incidents = await service.GetIncidentsAsync(44.0, 33.0, 45.0, 34.0);
+            Assert.DoesNotContain(incidents, i => i.Id == incident.Id);
+        }
+    }
 }

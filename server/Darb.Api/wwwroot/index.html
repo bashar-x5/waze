@@ -172,6 +172,144 @@
       color: #000;
     }
 
+    /* Tabs & Controls */
+    .tabs-nav {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 12px;
+      background: rgba(0, 0, 0, 0.3);
+      padding: 4px;
+      border-radius: 12px;
+      border: 1px solid var(--border-color);
+    }
+
+    .tab-btn {
+      flex: 1;
+      padding: 8px 6px;
+      border-radius: 8px;
+      border: none;
+      background: transparent;
+      color: var(--text-muted);
+      font-family: var(--font);
+      font-size: 11px;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      transition: all 0.2s;
+    }
+
+    .tab-btn.active {
+      background: var(--bg-card);
+      color: var(--primary);
+      border: 1px solid var(--border-glow);
+      box-shadow: 0 0 10px rgba(0, 210, 255, 0.2);
+    }
+
+    .tab-pane {
+      display: none;
+    }
+
+    .tab-pane.active {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .user-card {
+      padding: 10px 12px;
+      background: var(--bg-card);
+      border-radius: 10px;
+      border: 1px solid var(--border-color);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      font-size: 11px;
+    }
+
+    .user-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .user-mac {
+      font-family: var(--mono);
+      font-weight: 700;
+      color: var(--primary);
+      font-size: 12px;
+    }
+
+    .badge {
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 10px;
+      font-weight: 700;
+    }
+
+    .badge-active { background: rgba(0, 230, 118, 0.15); color: var(--success); border: 1px solid rgba(0, 230, 118, 0.3); }
+    .badge-trusted { background: rgba(0, 210, 255, 0.15); color: var(--primary); border: 1px solid rgba(0, 210, 255, 0.3); }
+    .badge-blocked { background: rgba(255, 61, 0, 0.15); color: var(--danger); border: 1px solid rgba(255, 61, 0, 0.3); }
+    .badge-warning { background: rgba(255, 214, 0, 0.15); color: var(--warning); border: 1px solid rgba(255, 214, 0, 0.4); }
+
+    .action-group {
+      display: flex;
+      gap: 6px;
+      margin-top: 4px;
+    }
+
+    .btn-sm {
+      padding: 4px 8px;
+      font-size: 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 700;
+      border: 1px solid var(--border-color);
+      background: var(--bg-panel);
+      color: var(--text);
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      transition: all 0.2s;
+    }
+
+    .btn-sm:hover {
+      border-color: var(--primary);
+      transform: translateY(-1px);
+    }
+
+    .btn-sm-danger {
+      background: rgba(255, 61, 0, 0.2);
+      border-color: var(--danger);
+      color: #FF8A80;
+    }
+    .btn-sm-danger:hover {
+      background: rgba(255, 61, 0, 0.4);
+      color: #FFF;
+    }
+
+    .btn-sm-warning {
+      background: rgba(255, 214, 0, 0.2);
+      border-color: var(--warning);
+      color: #FFE082;
+    }
+    .btn-sm-warning:hover {
+      background: rgba(255, 214, 0, 0.4);
+      color: #FFF;
+    }
+
+    .btn-sm-trust {
+      background: rgba(0, 210, 255, 0.2);
+      border-color: var(--primary);
+      color: #80D8FF;
+    }
+    .btn-sm-trust:hover {
+      background: rgba(0, 210, 255, 0.4);
+      color: #FFF;
+    }
+
     /* Main Dashboard Grid */
     main {
       flex: 1;
@@ -481,8 +619,20 @@
         </div>
       </div>
 
-      <!-- Card 2: Avg Speed -->
+      <!-- Card 2: Devices & Users -->
       <div class="kpi-card" style="--card-accent: #00E676;">
+        <div class="kpi-title">
+          <span id="lbl-users">الأجهزة والمستخدمون (MAC IDs)</span>
+          <span>👥</span>
+        </div>
+        <div class="kpi-value" id="val-users">--</div>
+        <div class="kpi-sub">
+          <span id="val-users-sub">-- أجهزة مسجلة</span>
+        </div>
+      </div>
+
+      <!-- Card 3: Avg Speed -->
+      <div class="kpi-card" style="--card-accent: #7C4DFF;">
         <div class="kpi-title">
           <span id="lbl-speed">متوسط سرعة الحركة في بغداد</span>
           <span>⚡</span>
@@ -493,7 +643,7 @@
         </div>
       </div>
 
-      <!-- Card 3: Active Incidents -->
+      <!-- Card 4: Active Incidents -->
       <div class="kpi-card" style="--card-accent: #FFA000;">
         <div class="kpi-title">
           <span id="lbl-incidents">البلاغات المرورية النشطة</span>
@@ -505,8 +655,20 @@
         </div>
       </div>
 
-      <!-- Card 4: Routing Engine & PostGIS -->
-      <div class="kpi-card" style="--card-accent: #7C4DFF;">
+      <!-- Card 5: Verified Warnings & Speed Bumps -->
+      <div class="kpi-card" style="--card-accent: #FFD600;">
+        <div class="kpi-title">
+          <span id="lbl-warnings">مطبات وتحذيرات معتمدة</span>
+          <span>🛑</span>
+        </div>
+        <div class="kpi-value" id="val-warnings">--</div>
+        <div class="kpi-sub">
+          <span id="val-warnings-sub">3+ تأكيدات من مستخدمين</span>
+        </div>
+      </div>
+
+      <!-- Card 6: Routing Engine & PostGIS -->
+      <div class="kpi-card" style="--card-accent: #00B0FF;">
         <div class="kpi-title">
           <span id="lbl-engine">محرك الملاحة OSRM و PostGIS</span>
           <span>🛰️</span>
@@ -518,50 +680,96 @@
       </div>
     </div>
 
-    <!-- Sidebar: Events & Controls -->
+    <!-- Sidebar: Events & Controls with Tabs -->
     <div class="sidebar">
-      <!-- Panel 1: Live Feed -->
-      <div class="panel">
-        <div class="panel-header">
-          <h2><span>📡</span> <span id="lbl-live-feed">سجل العمليات اللحظي</span></h2>
-          <span style="font-size: 11px; font-family: var(--mono); color: var(--primary);" id="val-clock">--:--:--</span>
-        </div>
-        <div class="feed-list" id="feed-container">
-          <div class="feed-item">
-            <div class="feed-icon">🚀</div>
-            <div class="feed-content">
-              <div class="feed-title">تم تشغيل خادم درب بنجاح</div>
-              <div class="feed-time">الآن • بغداد</div>
+      <!-- Tabs Navigation -->
+      <div class="tabs-nav">
+        <button class="tab-btn active" id="tab-btn-incidents" onclick="switchTab('incidents')">
+          <span>⚠️</span> <span id="lbl-tab-incidents">البلاغات والمطبات</span>
+        </button>
+        <button class="tab-btn" id="tab-btn-users" onclick="switchTab('users')">
+          <span>👥</span> <span id="lbl-tab-users">الأجهزة والتحكم</span>
+        </button>
+        <button class="tab-btn" id="tab-btn-ops" onclick="switchTab('ops')">
+          <span>🛰️</span> <span id="lbl-tab-ops">العمليات والسجل</span>
+        </button>
+      </div>
+
+      <!-- Tab 1: Incidents & Speed Bumps Management -->
+      <div class="tab-pane active" id="pane-incidents">
+        <div class="panel">
+          <div class="panel-header">
+            <h2><span>⚠️</span> <span id="lbl-panel-incidents">البلاغات والمطبات النشطة</span></h2>
+            <button class="btn-sm" onclick="fetchLiveStats(true)"><span>🔄</span> تحديث</button>
+          </div>
+          <div class="feed-list" id="incidents-container" style="max-height: 480px;">
+            <div style="font-size: 11px; color: var(--text-muted); text-align: center; padding: 20px;">
+              جارٍ تحميل البلاغات الحية...
             </div>
           </div>
         </div>
       </div>
 
-      <!-- Panel 2: Live Operational Controls -->
-      <div class="panel">
-        <div class="panel-header">
-          <h2><span>🛰️</span> <span id="lbl-actions">التحكم بالبيانات الحية</span></h2>
-        </div>
-        <div class="sim-controls">
-          <button class="btn btn-primary" onclick="triggerTrafficHarvest()" style="background: linear-gradient(135deg, #00D2FF, #0088AA); color: #0a0e14; font-weight: 800;">
-            <span>🛰️</span> <span id="btn-harvest">مزامنة حركة المرور الحية (TomTom Flow)</span>
-          </button>
-          <button class="btn" onclick="fetchLiveStats(true)">
-            <span>🔄</span> <span id="btn-refresh">تحديث البيانات الآن</span>
-          </button>
+      <!-- Tab 2: User Devices Controls -->
+      <div class="tab-pane" id="pane-users">
+        <div class="panel">
+          <div class="panel-header">
+            <h2><span>👥</span> <span id="lbl-panel-users">الأجهزة والمستخدمون المسجلون</span></h2>
+            <button class="btn-sm" onclick="fetchDashboardUsers()"><span>🔄</span> تحديث</button>
+          </div>
+          <div class="feed-list" id="users-container" style="max-height: 480px;">
+            <div style="font-size: 11px; color: var(--text-muted); text-align: center; padding: 20px;">
+              جارٍ تحميل بيانات الأجهزة...
+            </div>
+          </div>
         </div>
       </div>
 
-      <!-- Panel 3: Server Specifications -->
-      <div class="panel">
-        <div class="panel-header">
-          <h2><span>🖥️</span> <span id="lbl-server-spec">معلومات الخادم المضيف</span></h2>
+      <!-- Tab 3: Operations & Live Feed -->
+      <div class="tab-pane" id="pane-ops">
+        <!-- Live Operations Controls -->
+        <div class="panel">
+          <div class="panel-header">
+            <h2><span>🛰️</span> <span id="lbl-actions">التحكم بالبيانات الحية</span></h2>
+          </div>
+          <div class="sim-controls">
+            <button class="btn btn-primary" onclick="triggerTrafficHarvest()" style="background: linear-gradient(135deg, #00D2FF, #0088AA); color: #0a0e14; font-weight: 800;">
+              <span>🛰️</span> <span id="btn-harvest">مزامنة حركة المرور الحية (TomTom Flow)</span>
+            </button>
+            <button class="btn" onclick="fetchLiveStats(true)">
+              <span>🔄</span> <span id="btn-refresh">تحديث البيانات الآن</span>
+            </button>
+          </div>
         </div>
-        <div style="font-size: 12px; color: var(--text-muted); line-height: 1.8; font-family: var(--mono);">
-          <div>Host IP: <strong style="color: var(--primary);">139.185.47.123:5000</strong></div>
-          <div>Database: <span style="color: var(--success);">PostGIS 16 (Spatial Graph)</span></div>
-          <div>Routing: <span style="color: var(--success);">OSRM MLD (Iraq Graph)</span></div>
-          <div>Backend: <span style="color: var(--primary);">ASP.NET Core 10 Web API</span></div>
+
+        <!-- Live Feed -->
+        <div class="panel">
+          <div class="panel-header">
+            <h2><span>📡</span> <span id="lbl-live-feed">سجل العمليات اللحظي</span></h2>
+            <span style="font-size: 11px; font-family: var(--mono); color: var(--primary);" id="val-clock">--:--:--</span>
+          </div>
+          <div class="feed-list" id="feed-container" style="max-height: 220px;">
+            <div class="feed-item">
+              <div class="feed-icon">🚀</div>
+              <div class="feed-content">
+                <div class="feed-title">تم تشغيل خادم درب بنجاح</div>
+                <div class="feed-time">الآن • بغداد</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Server Specifications -->
+        <div class="panel">
+          <div class="panel-header">
+            <h2><span>🖥️</span> <span id="lbl-server-spec">معلومات الخادم المضيف</span></h2>
+          </div>
+          <div style="font-size: 12px; color: var(--text-muted); line-height: 1.8; font-family: var(--mono);">
+            <div>Host IP: <strong style="color: var(--primary);">139.185.47.123:5000</strong></div>
+            <div>Database: <span style="color: var(--success);">PostGIS 16 (Spatial Graph)</span></div>
+            <div>Routing: <span style="color: var(--success);">OSRM MLD (Iraq Graph)</span></div>
+            <div>Backend: <span style="color: var(--primary);">ASP.NET Core 10 Web API</span></div>
+          </div>
         </div>
       </div>
     </div>
@@ -584,9 +792,26 @@
     // State & Config
     let isArabic = true;
     let map, markersLayer;
+    let currentTab = 'incidents';
 
     // Baghdad coordinates
     const BAGHDAD_CENTER = [33.3152, 44.3661];
+
+    // Tab switcher
+    function switchTab(tabId) {
+      currentTab = tabId;
+      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+      document.querySelectorAll('.tab-pane').forEach(pane => pane.classList.remove('active'));
+
+      const btn = document.getElementById(`tab-btn-${tabId}`);
+      const pane = document.getElementById(`pane-${tabId}`);
+      if (btn) btn.classList.add('active');
+      if (pane) pane.classList.add('active');
+
+      if (tabId === 'users') {
+        fetchDashboardUsers();
+      }
+    }
 
     // Initialize Map with 100% Free Zero-API-Key Basemaps (No Watermarks)
     function initMap() {
@@ -651,9 +876,9 @@
         const data = await res.json();
         updateUI(data);
         if (manual) addFeedItem('🔄 تم تحديث الإحصائيات يدويًا', 'Stats updated');
+        if (currentTab === 'users') fetchDashboardUsers();
       } catch (err) {
         console.warn('Dashboard poll error:', err);
-        // Fallback to health endpoint
         fetchHealthFallback();
       }
     }
@@ -666,16 +891,191 @@
       } catch (e) {}
     }
 
-    // Update UI with real data
+    // Fetch and render registered device users
+    async function fetchDashboardUsers() {
+      try {
+        const res = await fetch('/api/dashboard/users');
+        if (!res.ok) return;
+        const users = await res.json();
+        renderUsersList(users);
+      } catch (e) {
+        console.warn('Error fetching users:', e);
+      }
+    }
+
+    function renderUsersList(users) {
+      const container = document.getElementById('users-container');
+      if (!container) return;
+
+      if (!users || users.length === 0) {
+        container.innerHTML = '<div style="font-size:11px; color:var(--text-muted); text-align:center; padding:20px;">لا توجد أجهزة مسجلة حالياً</div>';
+        return;
+      }
+
+      container.innerHTML = users.map(u => {
+        let badgeClass = 'badge-active';
+        let badgeText = isArabic ? 'نشط' : 'Active';
+        if (u.status === 'blocked') {
+          badgeClass = 'badge-blocked';
+          badgeText = isArabic ? 'محظور' : 'Blocked';
+        } else if (u.status === 'trusted') {
+          badgeClass = 'badge-trusted';
+          badgeText = isArabic ? 'موثوق ⭐' : 'Trusted ⭐';
+        }
+
+        const isBlocked = u.status === 'blocked';
+        const isTrusted = u.status === 'trusted';
+        const lastSeen = u.lastSeenSecondsAgo < 60 ? (isArabic ? 'الآن' : 'Now') : `${Math.round(u.lastSeenSecondsAgo/60)} ${isArabic ? 'دقيقة' : 'min'}`;
+
+        return `
+          <div class="user-card">
+            <div class="user-header">
+              <span class="user-mac">${u.userId}</span>
+              <span class="badge ${badgeClass}">${badgeText}</span>
+            </div>
+            <div style="color:var(--text-muted); font-size:11px;">
+              <span>📝 ${isArabic ? 'البلاغات:' : 'Reports:'} <b>${u.reportCount}</b></span> • 
+              <span>👍 ${isArabic ? 'التأكيدات:' : 'Confirms:'} <b>${u.confirmationCount}</b></span> • 
+              <span>⏱️ ${isArabic ? 'آخر ظهور:' : 'Last Seen:'} <b>${lastSeen}</b></span>
+            </div>
+            <div class="action-group">
+              <button class="btn-sm ${isBlocked ? 'btn-sm-warning' : 'btn-sm-danger'}" onclick="adminToggleBlock('${u.userId}')">
+                <span>${isBlocked ? '🔓' : '🚫'}</span> ${isBlocked ? (isArabic ? 'فك الحظر' : 'Unblock') : (isArabic ? 'حظر المستخدم' : 'Block User')}
+              </button>
+              <button class="btn-sm btn-sm-trust" onclick="adminToggleTrust('${u.userId}')">
+                <span>${isTrusted ? '⭐' : '🌟'}</span> ${isTrusted ? (isArabic ? 'إلغاء التوثيق' : 'Untrust') : (isArabic ? 'ترقية لموثوق' : 'Trust User')}
+              </button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // Render incident list in sidebar
+    function renderIncidentsList(incidents) {
+      const container = document.getElementById('incidents-container');
+      if (!container) return;
+
+      if (!incidents || incidents.length === 0) {
+        container.innerHTML = '<div style="font-size:11px; color:var(--text-muted); text-align:center; padding:20px;">لا توجد بلاغات مرورية نشطة حالياً</div>';
+        return;
+      }
+
+      container.innerHTML = incidents.map(inc => {
+        let iconEmoji = '⚠️';
+        let typeName = inc.type;
+        if (inc.type === 'bump' || inc.isRoadWarning) { iconEmoji = '🛑'; typeName = isArabic ? 'مطب اصطناعي معتمد' : 'Speed Bump'; }
+        else if (inc.type === 'crash' || inc.type === 'accident') { iconEmoji = '💥'; typeName = isArabic ? 'حادث سير' : 'Car Crash'; }
+        else if (inc.type === 'police') { iconEmoji = '👮'; typeName = isArabic ? 'مفرزة شرطة' : 'Police'; }
+        else if (inc.type === 'camera') { iconEmoji = '📷'; typeName = isArabic ? 'كاميرا رادار' : 'Speed Camera'; }
+        else if (inc.type === 'closure') { iconEmoji = '⛔'; typeName = isArabic ? 'طريق مغلق' : 'Closure'; }
+
+        const warningBadge = (inc.isRoadWarning || (inc.type === 'bump' && inc.confirmations >= 3))
+          ? `<span class="badge badge-warning">${isArabic ? '⚠️ تحذير معتمد (3+ سائقين)' : 'Verified Warning'}</span>`
+          : '';
+
+        return `
+          <div class="user-card" style="border-right: 3px solid ${inc.isRoadWarning ? 'var(--warning)' : 'var(--primary)'};">
+            <div class="user-header">
+              <span style="font-weight:800; display:flex; align-items:center; gap:6px;">
+                <span>${iconEmoji}</span> ${typeName}
+              </span>
+              ${warningBadge}
+            </div>
+            <div style="font-size:11px; color:var(--text); margin-top:2px;">
+              ${inc.description || (isArabic ? 'بلاغ مروري نشط' : 'Active Traffic Incident')}
+            </div>
+            <div style="color:var(--text-muted); font-size:10px; font-family:var(--mono);">
+              👤 جهاز: <b style="color:var(--primary);">${inc.userId || 'غير معروف'}</b> • 👍 تأكيدات: <b>${inc.confirmations}</b> • ⏳ متبقي: <b>${inc.expiresInMin} دقيقة</b>
+            </div>
+            <div class="action-group">
+              <button class="btn-sm btn-sm-danger" onclick="adminDeleteIncident('${inc.id}')">
+                <span>🗑️</span> ${isArabic ? 'حذف البلاغ' : 'Delete'}
+              </button>
+              ${!inc.isRoadWarning ? `
+                <button class="btn-sm btn-sm-warning" onclick="adminVerifyWarning('${inc.id}')">
+                  <span>⚠️</span> ${isArabic ? 'اعتماد كمطب دائم' : 'Verify as Speed Bump'}
+                </button>
+              ` : ''}
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // Admin action: Delete incident
+    async function adminDeleteIncident(id) {
+      if (!confirm(isArabic ? 'هل أنت متأكد من حذف هذا البلاغ نهائياً؟' : 'Are you sure you want to delete this incident?')) return;
+      try {
+        const res = await fetch(`/api/traffic/incidents/${id}`, { method: 'DELETE' });
+        if (res.ok) {
+          addFeedItem(`🗑️ تم حذف البلاغ (${id}) من الخريطة`, `Incident ${id} deleted`);
+          fetchLiveStats(true);
+        } else {
+          alert('تعذر حذف البلاغ');
+        }
+      } catch (e) {
+        alert('خطأ في الاتصال بالخادم');
+      }
+    }
+
+    // Admin action: Verify as road warning (speed bump)
+    async function adminVerifyWarning(id) {
+      try {
+        const res = await fetch(`/api/traffic/incidents/${id}/verify-warning`, { method: 'POST' });
+        if (res.ok) {
+          addFeedItem(`⚠️ تم اعتماد البلاغ (${id}) كمطب وتحذير طريق دائم`, `Incident ${id} verified as road warning`);
+          fetchLiveStats(true);
+        } else {
+          alert('تعذر اعتماد البلاغ');
+        }
+      } catch (e) {
+        alert('خطأ في الاتصال بالخادم');
+      }
+    }
+
+    // Admin action: Toggle block user
+    async function adminToggleBlock(userId) {
+      try {
+        const res = await fetch(`/api/dashboard/users/${userId}/toggle-block`, { method: 'POST' });
+        if (res.ok) {
+          addFeedItem(`🛡️ تم تغيير حالة حظر الجهاز (${userId})`, `User ${userId} block toggled`);
+          fetchLiveStats(true);
+          fetchDashboardUsers();
+        }
+      } catch (e) {
+        alert('خطأ في الاتصال');
+      }
+    }
+
+    // Admin action: Toggle trust user
+    async function adminToggleTrust(userId) {
+      try {
+        const res = await fetch(`/api/dashboard/users/${userId}/toggle-trust`, { method: 'POST' });
+        if (res.ok) {
+          addFeedItem(`⭐ تم تغيير حالة توثيق الجهاز (${userId})`, `User ${userId} trust toggled`);
+          fetchLiveStats(true);
+          fetchDashboardUsers();
+        }
+      } catch (e) {
+        alert('خطأ في الاتصال');
+      }
+    }
+
     // Update UI with real data
     function updateUI(data) {
       const m = data.metrics || {};
       const h = data.health || {};
 
       document.getElementById('val-vehicles').innerText = m.activeVehicles ?? 0;
-      document.getElementById('val-obs-rate').innerText = (m.totalObservations ?? 0) + ' إجمالي إشارات GPS';
+      document.getElementById('val-obs-rate').innerText = (m.totalObservations ?? 0) + ' إشارة GPS مستلمة';
 
-      // Real speed telemetry: use active vehicles average if present, or compute real TomTom corridors average
+      document.getElementById('val-users').innerText = m.totalUsersCount ?? (m.activeVehicles ?? 0);
+      document.getElementById('val-users-sub').innerText = m.blockedUsersCount ? `${m.blockedUsersCount} محظور` : (isArabic ? 'جميع الأجهزة مصرحة' : 'All devices clear');
+
+      document.getElementById('val-warnings').innerText = m.roadWarningsCount ?? (m.speedBumpsCount ?? 0);
+      document.getElementById('val-warnings-sub').innerText = isArabic ? `${m.speedBumpsCount ?? 0} مطب اصطناعي` : `${m.speedBumpsCount ?? 0} speed bumps`;
+
       let displaySpeed = '--';
       if (m.avgSpeedKmh > 0) {
         displaySpeed = typeof m.avgSpeedKmh === 'number' ? m.avgSpeedKmh.toFixed(1) : m.avgSpeedKmh;
@@ -688,6 +1088,9 @@
       document.getElementById('val-incidents').innerText = m.activeIncidentsCount ?? 0;
       document.getElementById('val-latency').innerText = (h.routingEngine?.latencyMs ?? 1) + ' ms';
       document.getElementById('val-db-status').innerText = 'PostGIS: ' + (h.database?.status ?? 'Online');
+
+      // Update sidebar incident list
+      renderIncidentsList(data.recentIncidents);
 
       // Update map markers
       markersLayer.clearLayers();
@@ -727,24 +1130,52 @@
         });
       }
 
-      // Render recent incidents
+      // Render incidents and speed bump warnings on map
       if (data.recentIncidents) {
         data.recentIncidents.forEach(inc => {
           let iconEmoji = '⚠️';
-          if (inc.type === 'accident') iconEmoji = '💥';
-          if (inc.type === 'police') iconEmoji = '👮';
-          if (inc.type === 'standstill') iconEmoji = '🛑';
-          if (inc.type === 'closure') iconEmoji = '⛔';
+          let isWarning = inc.isRoadWarning || inc.type === 'bump';
+          if (isWarning) iconEmoji = '🛑';
+          else if (inc.type === 'accident' || inc.type === 'crash') iconEmoji = '💥';
+          else if (inc.type === 'police') iconEmoji = '👮';
+          else if (inc.type === 'camera') iconEmoji = '📷';
+          else if (inc.type === 'closure') iconEmoji = '⛔';
 
           const icon = L.divIcon({
-            html: `<div style="font-size: 24px; filter: drop-shadow(0 0 6px rgba(255,61,0,0.8)); cursor: pointer;">${iconEmoji}</div>`,
+            html: `
+              <div style="position:relative; font-size:24px; filter: drop-shadow(0 0 8px ${isWarning ? 'rgba(255,214,0,0.9)' : 'rgba(255,61,0,0.8)'}); cursor: pointer;">
+                ${iconEmoji}
+                ${inc.confirmations >= 3 ? '<span style="position:absolute; top:-6px; right:-6px; background:#FFD600; color:#000; font-size:9px; font-weight:900; padding:1px 4px; border-radius:10px;">3+</span>' : ''}
+              </div>
+            `,
             className: 'custom-incident-icon',
             iconSize: [30, 30],
             iconAnchor: [15, 15]
           });
 
           L.marker([inc.latitude, inc.longitude], { icon })
-            .bindPopup(`<b>${inc.type.toUpperCase()}</b><br>${inc.description || 'بلاغ مروري نشط'}<br><small>تأكيدات: ${inc.confirmations}</small>`)
+            .bindPopup(`
+              <div style="font-family: inherit; direction: ${isArabic ? 'rtl' : 'ltr'}; padding: 6px; min-width: 180px;">
+                <b style="font-size: 13px; color: ${isWarning ? '#FFD600' : '#FF3D00'};">
+                  ${isWarning ? '⚠️ مطب اصطناعي معتمد' : inc.type.toUpperCase()}
+                </b><br/>
+                <span style="font-size: 12px;">${inc.description || 'بلاغ مروري نشط'}</span><br/>
+                <div style="font-size: 11px; color: #8A99AD; margin: 4px 0;">
+                  👤 جهاز: <b style="color: #00D2FF;">${inc.userId || 'غير معروف'}</b><br/>
+                  👍 تأكيدات: <b style="color: #00E676;">${inc.confirmations}</b>
+                </div>
+                <div style="display: flex; gap: 6px; margin-top: 8px;">
+                  <button onclick="adminDeleteIncident('${inc.id}')" style="flex:1; background:#FF3D00; color:white; border:none; padding:4px 8px; border-radius:6px; font-size:10px; font-weight:700; cursor:pointer;">
+                    🗑️ حذف البلاغ
+                  </button>
+                  ${!isWarning ? `
+                    <button onclick="adminVerifyWarning('${inc.id}')" style="flex:1; background:#FFA000; color:#0A0E14; border:none; padding:4px 8px; border-radius:6px; font-size:10px; font-weight:800; cursor:pointer;">
+                      ⚠️ اعتماد كمطب
+                    </button>
+                  ` : ''}
+                </div>
+              </div>
+            `)
             .addTo(markersLayer);
         });
       }
@@ -790,6 +1221,7 @@
     // Add Live Feed Item
     function addFeedItem(arText, enText) {
       const container = document.getElementById('feed-container');
+      if (!container) return;
       const timeStr = new Date().toLocaleTimeString('ar-IQ');
       const item = document.createElement('div');
       item.className = 'feed-item';
@@ -833,9 +1265,14 @@
         ? 'درب — مركز العمليات والتحكم المروري' 
         : 'Darb — Traffic Mission Control & Telemetry';
       document.getElementById('lbl-vehicles').innerText = isArabic ? 'السائقون النشطون (10 دقائق)' : 'Active Drivers (10m)';
+      document.getElementById('lbl-users').innerText = isArabic ? 'الأجهزة والمستخدمون (MAC IDs)' : 'Devices & Users (MAC IDs)';
       document.getElementById('lbl-speed').innerText = isArabic ? 'متوسط سرعة الحركة في بغداد' : 'Avg Traffic Speed';
       document.getElementById('lbl-incidents').innerText = isArabic ? 'البلاغات المرورية النشطة' : 'Active Traffic Incidents';
+      document.getElementById('lbl-warnings').innerText = isArabic ? 'مطبات وتحذيرات معتمدة' : 'Verified Bumps & Warnings';
       document.getElementById('lbl-engine').innerText = isArabic ? 'محرك الملاحة OSRM و PostGIS' : 'Routing & Spatial Engine';
+      document.getElementById('lbl-tab-incidents').innerText = isArabic ? 'البلاغات والمطبات' : 'Incidents & Bumps';
+      document.getElementById('lbl-tab-users').innerText = isArabic ? 'الأجهزة والتحكم' : 'Devices & Controls';
+      document.getElementById('lbl-tab-ops').innerText = isArabic ? 'العمليات والسجل' : 'Operations & Feed';
       document.getElementById('lbl-live-feed').innerText = isArabic ? 'سجل العمليات اللحظي' : 'Live Event Stream';
       document.getElementById('lbl-actions').innerText = isArabic ? 'التحكم بالبيانات الحية' : 'Live Operational Controls';
       document.getElementById('btn-harvest').innerText = isArabic ? 'مزامنة حركة المرور الحية (TomTom Flow)' : 'Harvest Live Traffic (TomTom Flow)';
@@ -846,7 +1283,8 @@
 
     // Clock
     setInterval(() => {
-      document.getElementById('val-clock').innerText = new Date().toLocaleTimeString('ar-IQ');
+      const clockEl = document.getElementById('val-clock');
+      if (clockEl) clockEl.innerText = new Date().toLocaleTimeString('ar-IQ');
     }, 1000);
 
     // Initialize & Poll

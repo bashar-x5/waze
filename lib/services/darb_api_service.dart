@@ -106,6 +106,9 @@ class DarbApiService {
           case 'weather':
             type = ReportType.weather;
             break;
+          case 'bump':
+            type = ReportType.bump;
+            break;
           case 'crash':
           default:
             type = ReportType.crash;
@@ -127,6 +130,9 @@ class DarbApiService {
           confirmations: (m['confirmations'] as num?)?.toInt() ?? 1,
           createdAt: createdAt,
           expiresAt: expiresAt,
+          userId: m['userId']?.toString(),
+          isVerified: m['isVerified'] == true,
+          isRoadWarning: m['isRoadWarning'] == true,
         );
       }).toList();
     } catch (_) {
@@ -135,7 +141,7 @@ class DarbApiService {
   }
 
   /// Submits a new user incident report to the backend.
-  Future<bool> reportIncident(RoadReport report) async {
+  Future<bool> reportIncident(RoadReport report, {String? userId}) async {
     if (_disposed) return false;
     final uri = Uri.parse('$_baseUrl/api/traffic/incidents');
     try {
@@ -149,6 +155,7 @@ class DarbApiService {
               'latitude': report.point.latitude,
               'longitude': report.point.longitude,
               'description': report.description,
+              'userId': userId ?? report.userId,
             }),
           )
           .timeout(const Duration(seconds: 8));
@@ -160,11 +167,17 @@ class DarbApiService {
   }
 
   /// Confirms an existing incident report (+1 verification).
-  Future<bool> confirmIncident(String incidentId) async {
+  Future<bool> confirmIncident(String incidentId, {String? userId}) async {
     if (_disposed) return false;
     final uri = Uri.parse('$_baseUrl/api/traffic/incidents/$incidentId/confirm');
     try {
-      final response = await _client.post(uri).timeout(const Duration(seconds: 5));
+      final response = await _client
+          .post(
+            uri,
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({'userId': userId}),
+          )
+          .timeout(const Duration(seconds: 5));
       return response.statusCode == 200;
     } catch (_) {
       return false;

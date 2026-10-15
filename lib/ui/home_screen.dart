@@ -427,6 +427,39 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         );
       }
 
+      // Render active road reports and verified speed bump warnings on map
+      for (final report in c.reports) {
+        if (!report.isActive) continue;
+        String circleColor = '#FF9500';
+        double radius = 8.0;
+        double strokeWidth = 2.0;
+
+        if (report.type == ReportType.bump || report.isRoadWarning) {
+          circleColor = '#FFD600'; // Amber yellow for speed bump warning
+          radius = 10.0;
+          strokeWidth = 3.0;
+        } else if (report.type == ReportType.police) {
+          circleColor = '#00D2FF'; // Blue for police/checkpoint
+        } else if (report.type == ReportType.crash || report.type == ReportType.traffic) {
+          circleColor = '#FF3B30'; // Red for crash/congestion
+        } else if (report.type == ReportType.camera) {
+          circleColor = '#7C4DFF'; // Purple for speed camera
+        } else if (report.type == ReportType.closure) {
+          circleColor = '#FF1744'; // Bright red for road closure
+        }
+
+        await controller.addCircle(
+          CircleOptions(
+            geometry: _toMapLibre(report.point),
+            circleColor: circleColor,
+            circleRadius: radius,
+            circleStrokeColor: '#FFFFFF',
+            circleStrokeWidth: strokeWidth,
+            circleOpacity: 0.95,
+          ),
+        );
+      }
+
       if (c.routes.isEmpty) return;
 
       // 1. Render alternative routes underneath

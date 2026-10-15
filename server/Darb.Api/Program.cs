@@ -228,18 +228,79 @@ app.MapPost("/api/traffic/incidents", async (
 // Confirm existing traffic incident
 app.MapPost("/api/traffic/incidents/{id}/confirm", async (
     [FromRoute] string id,
+    [FromBody] ConfirmIncidentRequest? request,
     ITrafficIntelligenceService trafficService,
     CancellationToken cancellationToken) =>
 {
-    var confirmed = await trafficService.ConfirmIncidentAsync(id, cancellationToken);
+    var confirmed = await trafficService.ConfirmIncidentAsync(id, request?.UserId, cancellationToken);
     if (!confirmed)
     {
-        return Results.NotFound(new { error = $"Incident with ID '{id}' not found." });
+        return Results.NotFound(new { error = $"Incident with ID '{id}' not found or user blocked." });
     }
 
     return Results.Ok(new { message = "Incident confirmed." });
 })
 .WithName("ConfirmIncident");
+
+// Delete traffic incident (Dashboard Admin control)
+app.MapDelete("/api/traffic/incidents/{id}", async (
+    [FromRoute] string id,
+    ITrafficIntelligenceService trafficService,
+    CancellationToken cancellationToken) =>
+{
+    var deleted = await trafficService.DeleteIncidentAsync(id, cancellationToken);
+    if (!deleted)
+    {
+        return Results.NotFound(new { error = $"Incident '{id}' not found." });
+    }
+    return Results.Ok(new { message = "Incident deleted successfully." });
+})
+.WithName("DeleteIncident");
+
+// Verify incident as permanent/long-term road warning (Speed Bump)
+app.MapPost("/api/traffic/incidents/{id}/verify-warning", async (
+    [FromRoute] string id,
+    ITrafficIntelligenceService trafficService,
+    CancellationToken cancellationToken) =>
+{
+    var verified = await trafficService.VerifyIncidentAsWarningAsync(id, cancellationToken);
+    if (!verified)
+    {
+        return Results.NotFound(new { error = $"Incident '{id}' not found." });
+    }
+    return Results.Ok(new { message = "Incident verified as road warning." });
+})
+.WithName("VerifyIncidentAsWarning");
+
+// User management endpoints (Dashboard Controls)
+app.MapGet("/api/dashboard/users", async (
+    ITrafficIntelligenceService trafficService,
+    CancellationToken cancellationToken) =>
+{
+    var users = await trafficService.GetUsersAsync(cancellationToken);
+    return Results.Ok(users);
+})
+.WithName("GetDashboardUsers");
+
+app.MapPost("/api/dashboard/users/{userId}/toggle-block", async (
+    [FromRoute] string userId,
+    ITrafficIntelligenceService trafficService,
+    CancellationToken cancellationToken) =>
+{
+    var success = await trafficService.ToggleUserBlockAsync(userId, cancellationToken);
+    return Results.Ok(new { message = "User block status toggled.", success });
+})
+.WithName("ToggleUserBlock");
+
+app.MapPost("/api/dashboard/users/{userId}/toggle-trust", async (
+    [FromRoute] string userId,
+    ITrafficIntelligenceService trafficService,
+    CancellationToken cancellationToken) =>
+{
+    var success = await trafficService.ToggleUserTrustAsync(userId, cancellationToken);
+    return Results.Ok(new { message = "User trust status toggled.", success });
+})
+.WithName("ToggleUserTrust");
 
 // Retrieve traffic incidents
 app.MapGet("/api/traffic/incidents", async (
@@ -347,11 +408,18 @@ app.MapGet("/api/dashboard/stats", async (
         ? Math.Round(latestVehicleFixes.Average(o => o.speedKmh), 1)
         : 0.0;
 
-    // Active incidents
+    // User metrics
+    var totalUsersCount = await db.Users.CountAsync(ct);
+    var blockedUsersCount = await db.Users.CountAsync(u => u.Status == "blocked", ct);
+    var roadWarningsCount = await db.TrafficIncidents.CountAsync(i => i.IsRoadWarning && i.ExpiresAt > now, ct);
+    var speedBumpsCount = await db.TrafficIncidents.CountAsync(i => i.Type == "bump" && i.ExpiresAt > now, ct);
+
+    // Active incidents & road warnings
     var activeIncidents = await db.TrafficIncidents
         .Where(i => i.ExpiresAt > now)
-        .OrderByDescending(i => i.CreatedAt)
-        .Take(50)
+        .OrderByDescending(i => i.IsRoadWarning)
+        .ThenByDescending(i => i.CreatedAt)
+        .Take(100)
         .Select(i => new {
             i.Id,
             i.Type,
@@ -360,6 +428,9 @@ app.MapGet("/api/dashboard/stats", async (
             i.Longitude,
             ReportedAt = i.CreatedAt,
             i.Confirmations,
+            i.IsVerified,
+            i.IsRoadWarning,
+            i.UserId,
             ExpiresInMin = Math.Max(0, (int)(i.ExpiresAt - now).TotalMinutes)
         })
         .ToListAsync(ct);
@@ -393,6 +464,10 @@ app.MapGet("/api/dashboard/stats", async (
             activeVehicles,
             avgSpeedKmh = avgSpeed,
             activeIncidentsCount = activeIncidents.Count,
+            roadWarningsCount,
+            speedBumpsCount,
+            totalUsersCount,
+            blockedUsersCount,
             congestedSegmentsCount = congestionSegments.Count(s => s.CongestionLevel != "Free")
         },
         health = new

@@ -38,14 +38,16 @@ public class GpsObservationDto
 public class TrafficIncident
 {
     public string Id { get; set; } = string.Empty;
-    public string Type { get; set; } = string.Empty; // police, traffic, hazard, crash, closure, construction, weather, camera
+    public string Type { get; set; } = string.Empty; // police, traffic, hazard, crash, closure, construction, weather, camera, bump
     public double Latitude { get; set; }
     public double Longitude { get; set; }
     public string Description { get; set; } = string.Empty;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime ExpiresAt { get; set; } = DateTime.UtcNow.AddHours(1);
-    public int Confirmations { get; set; } = 0;
+    public int Confirmations { get; set; } = 1;
     public bool IsVerified { get; set; } = false;
+    public bool IsRoadWarning { get; set; } = false;
+    public string? UserId { get; set; }
     public DateTime? LastConfirmedAt { get; set; }
 }
 
@@ -74,6 +76,75 @@ public class TrafficIncidentDto
 
     [JsonPropertyName("confirmations")]
     public int Confirmations { get; set; } = 0;
+
+    [JsonPropertyName("isVerified")]
+    public bool IsVerified { get; set; } = false;
+
+    [JsonPropertyName("isRoadWarning")]
+    public bool IsRoadWarning { get; set; } = false;
+
+    [JsonPropertyName("userId")]
+    public string? UserId { get; set; }
+}
+
+public class IncidentConfirmation
+{
+    public long Id { get; set; }
+    public string IncidentId { get; set; } = string.Empty;
+    public string UserId { get; set; } = string.Empty;
+    public DateTime ConfirmedAt { get; set; } = DateTime.UtcNow;
+}
+
+public class ConfirmIncidentRequest
+{
+    [JsonPropertyName("userId")]
+    public string? UserId { get; set; }
+}
+
+public class DarbUser
+{
+    public string UserId { get; set; } = string.Empty; // Persistent MAC or hardware ID e.g. MAC-XX:XX:XX:XX:XX:XX
+    public DateTime FirstSeenAt { get; set; } = DateTime.UtcNow;
+    public DateTime LastSeenAt { get; set; } = DateTime.UtcNow;
+    public int ReportCount { get; set; } = 0;
+    public int ConfirmationCount { get; set; } = 0;
+    public string Status { get; set; } = "active"; // active, trusted, blocked
+    public double? LastLatitude { get; set; }
+    public double? LastLongitude { get; set; }
+    public double? LastSpeedKmh { get; set; }
+}
+
+public class DarbUserDto
+{
+    [JsonPropertyName("userId")]
+    public string UserId { get; set; } = string.Empty;
+
+    [JsonPropertyName("firstSeenAt")]
+    public DateTime FirstSeenAt { get; set; }
+
+    [JsonPropertyName("lastSeenAt")]
+    public DateTime LastSeenAt { get; set; }
+
+    [JsonPropertyName("reportCount")]
+    public int ReportCount { get; set; }
+
+    [JsonPropertyName("confirmationCount")]
+    public int ConfirmationCount { get; set; }
+
+    [JsonPropertyName("status")]
+    public string Status { get; set; } = "active";
+
+    [JsonPropertyName("lastLatitude")]
+    public double? LastLatitude { get; set; }
+
+    [JsonPropertyName("lastLongitude")]
+    public double? LastLongitude { get; set; }
+
+    [JsonPropertyName("lastSpeedKmh")]
+    public double? LastSpeedKmh { get; set; }
+
+    [JsonPropertyName("lastSeenSecondsAgo")]
+    public int LastSeenSecondsAgo => Math.Max(0, (int)(DateTime.UtcNow - LastSeenAt).TotalSeconds);
 }
 
 public class RoadTrafficAggregate
