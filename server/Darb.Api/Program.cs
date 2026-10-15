@@ -28,6 +28,8 @@ builder.Services.AddHttpClient<IOsrmRoutingService, OsrmRoutingService>(client =
 
 // 3. Traffic Intelligence & Background Aggregation
 builder.Services.AddScoped<ITrafficIntelligenceService, TrafficIntelligenceService>();
+builder.Services.AddHttpClient<ITomTomTrafficHarvester, TomTomTrafficHarvester>();
+builder.Services.AddScoped<ITomTomTrafficHarvester, TomTomTrafficHarvester>();
 builder.Services.AddHostedService<TrafficAggregationWorker>();
 
 // 4. CORS Policy for mobile and web clients
@@ -244,6 +246,16 @@ app.MapGet("/api/traffic/incidents", async (
     return Results.Ok(incidents);
 })
 .WithName("GetTrafficIncidents");
+
+// Harvest live traffic from TomTom into PostGIS database
+app.MapPost("/api/traffic/harvest", async (
+    ITomTomTrafficHarvester harvester,
+    CancellationToken ct) =>
+{
+    await harvester.HarvestBaghdadTrafficAsync(ct);
+    return Results.Ok(new { message = "Baghdad traffic harvested successfully from TomTom into local database." });
+})
+.WithName("HarvestTraffic");
 
 // -------------------------------------------------------------
 // DASHBOARD & TELEMETRY ENDPOINTS

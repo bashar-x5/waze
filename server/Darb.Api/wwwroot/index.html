@@ -406,6 +406,32 @@
         height: 500px;
       }
     }
+
+    /* Clean dark styling for tiles & layer control */
+    .map-tiles-dark {
+      filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%);
+    }
+
+    .leaflet-control-layers {
+      background: rgba(16, 23, 34, 0.95) !important;
+      color: #F0F4F8 !important;
+      border: 1px solid rgba(255, 255, 255, 0.15) !important;
+      border-radius: 12px !important;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6) !important;
+      font-family: var(--font) !important;
+      font-size: 12px !important;
+      backdrop-filter: blur(8px) !important;
+    }
+    .leaflet-control-layers-expanded {
+      padding: 10px 14px !important;
+    }
+    .leaflet-control-layers-base label {
+      display: flex !important;
+      align-items: center !important;
+      gap: 8px !important;
+      margin-bottom: 6px !important;
+      cursor: pointer !important;
+    }
   </style>
 </head>
 <body>
@@ -427,6 +453,10 @@
         <span class="status-dot"></span>
         <span id="txt-status">متصل ومباشر • ONLINE</span>
       </div>
+      <a href="/darb.apk" class="btn" style="background: rgba(0, 210, 255, 0.12); border: 1px solid var(--primary); color: var(--primary); text-decoration: none; font-weight: 700; display: inline-flex; align-items: center; gap: 6px;">
+        <span>📱</span>
+        <span id="btn-dl-apk">تحميل APK</span>
+      </a>
       <button class="btn" onclick="toggleLang()" id="btn-lang">English</button>
       <button class="btn btn-primary" onclick="triggerSimulation()">
         <span>⚡</span>
@@ -513,6 +543,9 @@
           <h2><span>🛠️</span> <span id="lbl-actions">أدوات واختبارات الخادم</span></h2>
         </div>
         <div class="sim-controls">
+          <button class="btn btn-primary" onclick="triggerTrafficHarvest()" style="background: linear-gradient(135deg, #00D2FF, #0088AA); color: #0a0e14; font-weight: 800;">
+            <span>🛰️</span> <span id="btn-harvest">مزامنة حركة المرور الحية (TomTom Flow)</span>
+          </button>
           <button class="btn" onclick="sendTestObservation()">
             <span>📍</span> <span id="btn-test-gps">إرسال إحداثية مركبة تجريبية (مطار بغداد)</span>
           </button>
@@ -564,7 +597,7 @@
     // Baghdad coordinates
     const BAGHDAD_CENTER = [33.3152, 44.3661];
 
-    // Initialize Map
+    // Initialize Map with 100% Free Zero-API-Key Basemaps (No Watermarks)
     function initMap() {
       map = L.map('map', {
         center: BAGHDAD_CENTER,
@@ -574,12 +607,47 @@
 
       L.control.zoom({ position: 'topleft' }).addTo(map);
 
-      // OpenFreeMap Positron / Carto Dark Tiles
-      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-        attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
-        subdomains: 'abcd',
+      // Base 1: Esri World Dark Gray (Zero API Key, No Watermark, Clean for Dashboards)
+      const esriDarkBase = L.tileLayer('https://services.arcgisonline.com/arcgis/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
+        attribution: '&copy; Esri &mdash; Darb Traffic Engine',
+        maxZoom: 18
+      });
+      const esriDarkLabels = L.tileLayer('https://services.arcgisonline.com/arcgis/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}', {
+        attribution: '',
+        maxZoom: 18
+      });
+      const darbDarkGroup = L.layerGroup([esriDarkBase, esriDarkLabels]);
+
+      // Base 2: OpenStreetMap Cyberpunk Dark (Inverted, Zero API Key)
+      const osmDarkLayer = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors',
+        className: 'map-tiles-dark',
         maxZoom: 19
-      }).addTo(map);
+      });
+
+      // Base 3: Esri High-Resolution Satellite (Zero API Key)
+      const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+        attribution: '&copy; Esri World Imagery',
+        maxZoom: 19
+      });
+
+      // Base 4: Standard OpenStreetMap Day (Zero API Key)
+      const osmDayLayer = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors',
+        maxZoom: 19
+      });
+
+      // Default to Darb Dark
+      darbDarkGroup.addTo(map);
+
+      // Interactive Layer Switcher
+      const baseLayers = {
+        "🌙 درب داكن (Darb Dark)": darbDarkGroup,
+        "🌌 أوبن ستريت داكن (OSM Dark)": osmDarkLayer,
+        "🛰️ قمر صناعي (Satellite)": satelliteLayer,
+        "☀️ شوارع نهارية (OSM Day)": osmDayLayer
+      };
+      L.control.layers(baseLayers, null, { position: 'topright' }).addTo(map);
 
       markersLayer = L.layerGroup().addTo(map);
       testRouteLayer = L.layerGroup().addTo(map);
@@ -677,6 +745,20 @@
       container.prepend(item);
       if (container.children.length > 20) {
         container.removeChild(container.lastChild);
+      }
+    // Action: Trigger TomTom Traffic Harvest into local PostGIS database
+    async function triggerTrafficHarvest() {
+      addFeedItem('🛰️ جارٍ مزامنة حركة مرور بغداد عبر TomTom إلى قاعدة البيانات...', 'Harvesting Baghdad traffic flow from TomTom...');
+      try {
+        const res = await fetch('/api/traffic/harvest', { method: 'POST' });
+        if (res.ok) {
+          addFeedItem('✅ اكتملت مزامنة شرايين بغداد وحفظها بنجاح في قاعدة بيانات درب', 'Traffic harvested & indexed into PostGIS');
+          fetchLiveStats(true);
+        } else {
+          addFeedItem('⚠️ تعذر إكمال المزامنة مع TomTom', 'TomTom harvest error');
+        }
+      } catch (e) {
+        addFeedItem('❌ خطأ في الاتصال بالخادم', 'Connection error');
       }
     }
 
