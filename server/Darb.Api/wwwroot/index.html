@@ -458,9 +458,9 @@
         <span id="btn-dl-apk">تحميل APK</span>
       </a>
       <button class="btn" onclick="toggleLang()" id="btn-lang">English</button>
-      <button class="btn btn-primary" onclick="triggerSimulation()">
-        <span>⚡</span>
-        <span id="btn-sim-text">محاكاة حركة مرور بغداد</span>
+      <button class="btn btn-primary" onclick="fetchLiveStats(true)">
+        <span>🔄</span>
+        <span id="btn-refresh-top">تحديث البيانات الحية</span>
       </button>
     </div>
   </header>
@@ -537,23 +537,14 @@
         </div>
       </div>
 
-      <!-- Panel 2: Live Server Actions & Tools -->
+      <!-- Panel 2: Live Operational Controls -->
       <div class="panel">
         <div class="panel-header">
-          <h2><span>🛠️</span> <span id="lbl-actions">أدوات واختبارات الخادم</span></h2>
+          <h2><span>🛰️</span> <span id="lbl-actions">التحكم بالبيانات الحية</span></h2>
         </div>
         <div class="sim-controls">
           <button class="btn btn-primary" onclick="triggerTrafficHarvest()" style="background: linear-gradient(135deg, #00D2FF, #0088AA); color: #0a0e14; font-weight: 800;">
             <span>🛰️</span> <span id="btn-harvest">مزامنة حركة المرور الحية (TomTom Flow)</span>
-          </button>
-          <button class="btn" onclick="sendTestObservation()">
-            <span>📍</span> <span id="btn-test-gps">إرسال إحداثية مركبة تجريبية (مطار بغداد)</span>
-          </button>
-          <button class="btn" onclick="reportTestIncident()">
-            <span>🚨</span> <span id="btn-test-incident">تسجيل بلاغ حادث تجريبي (الجادرية)</span>
-          </button>
-          <button class="btn" onclick="calculateTestRoute()">
-            <span>🗺️</span> <span id="btn-test-route">طلب مسار تجريبي عبر OSRM الموضعي</span>
           </button>
           <button class="btn" onclick="fetchLiveStats(true)">
             <span>🔄</span> <span id="btn-refresh">تحديث البيانات الآن</span>
@@ -592,7 +583,7 @@
   <script>
     // State & Config
     let isArabic = true;
-    let map, testRouteLayer, markersLayer;
+    let map, markersLayer;
 
     // Baghdad coordinates
     const BAGHDAD_CENTER = [33.3152, 44.3661];
@@ -650,7 +641,6 @@
       L.control.layers(baseLayers, null, { position: 'topright' }).addTo(map);
 
       markersLayer = L.layerGroup().addTo(map);
-      testRouteLayer = L.layerGroup().addTo(map);
     }
 
     // Live Stats Fetching
@@ -677,19 +667,65 @@
     }
 
     // Update UI with real data
+    // Update UI with real data
     function updateUI(data) {
       const m = data.metrics || {};
       const h = data.health || {};
 
       document.getElementById('val-vehicles').innerText = m.activeVehicles ?? 0;
       document.getElementById('val-obs-rate').innerText = (m.totalObservations ?? 0) + ' إجمالي إشارات GPS';
-      document.getElementById('val-speed').innerText = m.avgSpeedKmh > 0 ? m.avgSpeedKmh : '42.5';
+
+      // Real speed telemetry: use active vehicles average if present, or compute real TomTom corridors average
+      let displaySpeed = '--';
+      if (m.avgSpeedKmh > 0) {
+        displaySpeed = typeof m.avgSpeedKmh === 'number' ? m.avgSpeedKmh.toFixed(1) : m.avgSpeedKmh;
+      } else if (data.congestionSegments && data.congestionSegments.length > 0) {
+        const sum = data.congestionSegments.reduce((acc, c) => acc + (c.averageSpeedKmh || 0), 0);
+        displaySpeed = (sum / data.congestionSegments.length).toFixed(1);
+      }
+      document.getElementById('val-speed').innerText = displaySpeed;
+
       document.getElementById('val-incidents').innerText = m.activeIncidentsCount ?? 0;
       document.getElementById('val-latency').innerText = (h.routingEngine?.latencyMs ?? 1) + ' ms';
       document.getElementById('val-db-status').innerText = 'PostGIS: ' + (h.database?.status ?? 'Online');
 
       // Update map markers
       markersLayer.clearLayers();
+
+      // Render real TomTom harvested traffic corridors
+      if (data.congestionSegments && data.congestionSegments.length > 0) {
+        data.congestionSegments.forEach(seg => {
+          let color = '#00E676'; // green
+          let levelAr = 'انسيابية طبيعية';
+          let levelEn = 'Free Flow';
+          const lvl = String(seg.congestionLevel ?? '').toLowerCase();
+          if (lvl === 'moderate' || lvl === '1') {
+            color = '#FFEA00'; levelAr = 'تباطؤ طفيف'; levelEn = 'Moderate';
+          } else if (lvl === 'heavy' || lvl === '2') {
+            color = '#FF9100'; levelAr = 'ازدحام ملحوظ'; levelEn = 'Heavy';
+          } else if (lvl === 'standstill' || lvl === 'congested' || lvl === '3') {
+            color = '#FF3D00'; levelAr = 'توقف تام'; levelEn = 'Standstill';
+          }
+
+          const spd = Math.round(seg.averageSpeedKmh || 0);
+          const circle = L.circleMarker([seg.latitude, seg.longitude], {
+            radius: 10,
+            fillColor: color,
+            color: '#FFFFFF',
+            weight: 2,
+            opacity: 1,
+            fillOpacity: 0.85
+          }).bindPopup(`
+            <div style="font-family: inherit; direction: ${isArabic ? 'rtl' : 'ltr'}; padding: 4px;">
+              <b style="font-size: 13px; color: ${color};">● ${seg.roadName || seg.segmentKey}</b><br/>
+              <b>السرعة اللحظية:</b> ${spd} كم/س<br/>
+              <b>الحالة:</b> ${isArabic ? levelAr : levelEn}<br/>
+              <small style="color: #888;">مصدر: TomTom Traffic Flow (مباشر)</small>
+            </div>
+          `);
+          markersLayer.addLayer(circle);
+        });
+      }
 
       // Render recent incidents
       if (data.recentIncidents) {
@@ -764,111 +800,6 @@
       }
     }
 
-    // Test Action: Send simulated vehicle observation
-    async function sendTestObservation() {
-      // Mohammed Al-Qassim Highway coords
-      const lat = 33.3150 + (Math.random() - 0.5) * 0.04;
-      const lon = 44.3950 + (Math.random() - 0.5) * 0.04;
-      const speed = Math.floor(60 + Math.random() * 40);
-
-      try {
-        const res = await fetch('/api/traffic/observations', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            latitude: lat,
-            longitude: lon,
-            speedKmh: speed,
-            heading: 145.0,
-            observedAt: new Date().toISOString(),
-            sessionId: 'sim-vehicle-' + Math.floor(Math.random() * 10)
-          })
-        });
-
-        if (res.ok) {
-          addFeedItem(`🚗 مركبة أرسلت إحداثية: طريق المرور السريع (${speed} كم/س)`, `Vehicle fix sent: Highway (${speed} km/h)`);
-          fetchLiveStats();
-        }
-      } catch (e) {
-        alert('Error sending observation: ' + e);
-      }
-    }
-
-    // Test Action: Report test incident
-    async function reportTestIncident() {
-      // Jadriya Bridge coords
-      const lat = 33.2840 + (Math.random() - 0.5) * 0.02;
-      const lon = 44.3820 + (Math.random() - 0.5) * 0.02;
-      const types = ['accident', 'police', 'standstill', 'hazard'];
-      const chosen = types[Math.floor(Math.random() * types.length)];
-
-      try {
-        const res = await fetch('/api/traffic/incidents', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            type: chosen,
-            description: 'بلاغ تجريبي تم إنشاؤه من لوحة التحكم',
-            latitude: lat,
-            longitude: lon,
-            reportedAt: new Date().toISOString()
-          })
-        });
-
-        if (res.ok) {
-          addFeedItem(`🚨 تم تسجيل بلاغ مروري جديد (${chosen}) قرب الجادرية`, `New incident recorded (${chosen}) near Jadriya`);
-          fetchLiveStats();
-        }
-      } catch (e) {
-        alert('Error creating incident: ' + e);
-      }
-    }
-
-    // Test Action: Calculate Live OSRM Route
-    async function calculateTestRoute() {
-      // From Yarmouk to Karrada
-      const fromLon = 44.3411, fromLat = 33.3032;
-      const toLon = 44.4211, toLat = 33.3080;
-
-      try {
-        addFeedItem(`🗺️ جاري حساب مسار: اليرموك ⟵ الكرادة عبر OSRM...`, `Calculating route: Yarmouk to Karrada via OSRM...`);
-        const res = await fetch(`/api/route?fromLon=${fromLon}&fromLat=${fromLat}&toLon=${toLon}&toLat=${toLat}&alternatives=true`);
-        if (!res.ok) throw new Error('Routing failed');
-        const routes = await res.json();
-        
-        testRouteLayer.clearLayers();
-        if (routes && routes.length > 0) {
-          const r = routes[0];
-          const latLngs = r.points.map(p => [p.latitude, p.longitude]);
-          
-          const polyline = L.polyline(latLngs, {
-            color: '#00D2FF',
-            weight: 6,
-            opacity: 0.9,
-            lineJoin: 'round'
-          }).addTo(testRouteLayer);
-
-          map.fitBounds(polyline.getBounds(), { padding: [50, 50] });
-
-          const mins = Math.round(r.totalDurationSeconds / 60);
-          const distKm = (r.distanceMeters / 1000).toFixed(1);
-          addFeedItem(`✅ تم احتساب المسار بنجاح: ${distKm} كم خلال ${mins} دقيقة`, `Route calculated: ${distKm} km in ${mins} min`);
-        }
-      } catch (e) {
-        alert('Routing error: ' + e);
-      }
-    }
-
-    // Seed Baghdad traffic rush simulation
-    async function triggerSimulation() {
-      addFeedItem(`⚡ بدء محاكاة ذروة المرور في بغداد (5 مركبات وبلاغات)...`, `Starting Baghdad traffic rush simulation...`);
-      for (let i = 0; i < 5; i++) {
-        await sendTestObservation();
-      }
-      await reportTestIncident();
-      await calculateTestRoute();
-    }
-
     // Language Toggle
     function toggleLang() {
       isArabic = !isArabic;
@@ -884,12 +815,11 @@
       document.getElementById('lbl-incidents').innerText = isArabic ? 'البلاغات المرورية النشطة' : 'Active Traffic Incidents';
       document.getElementById('lbl-engine').innerText = isArabic ? 'محرك الملاحة OSRM و PostGIS' : 'Routing & Spatial Engine';
       document.getElementById('lbl-live-feed').innerText = isArabic ? 'سجل العمليات اللحظي' : 'Live Event Stream';
-      document.getElementById('lbl-actions').innerText = isArabic ? 'أدوات واختبارات الخادم' : 'Server Simulation Tools';
-      document.getElementById('btn-test-gps').innerText = isArabic ? 'إرسال إحداثية مركبة تجريبية' : 'Send Test GPS Ping';
-      document.getElementById('btn-test-incident').innerText = isArabic ? 'تسجيل بلاغ حادث تجريبي' : 'Report Test Incident';
-      document.getElementById('btn-test-route').innerText = isArabic ? 'طلب مسار تجريبي عبر OSRM' : 'Request Test Route via OSRM';
+      document.getElementById('lbl-actions').innerText = isArabic ? 'التحكم بالبيانات الحية' : 'Live Operational Controls';
+      document.getElementById('btn-harvest').innerText = isArabic ? 'مزامنة حركة المرور الحية (TomTom Flow)' : 'Harvest Live Traffic (TomTom Flow)';
       document.getElementById('btn-refresh').innerText = isArabic ? 'تحديث البيانات الآن' : 'Refresh Telemetry';
-      document.getElementById('btn-sim-text').innerText = isArabic ? 'محاكاة حركة مرور بغداد' : 'Simulate Baghdad Rush';
+      const topBtn = document.getElementById('btn-refresh-top');
+      if (topBtn) topBtn.innerText = isArabic ? 'تحديث البيانات الحية' : 'Refresh Live Data';
     }
 
     // Clock

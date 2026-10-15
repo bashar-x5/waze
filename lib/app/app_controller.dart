@@ -53,7 +53,7 @@ class AppController extends ChangeNotifier {
   bool voice = true;
   bool lessChatty = false;
   bool demoMode = false;
-  bool sharing = false;
+  bool sharing = true;
   bool busy = false;
   bool searching = false;
   bool locating = false;
@@ -88,13 +88,12 @@ class AppController extends ChangeNotifier {
   bool get backendConfigured => _community.configured;
   List<RoadReport> get reports {
     final values = <RoadReport>[
-      if (demoMode) ...demoReports(DateTime.now()),
-      ...localReports.where((r) => r.demo == demoMode),
-      if (!demoMode && sharing) ...sharedReports,
+      ...localReports.where((r) => !r.demo),
+      if (sharing) ...sharedReports.where((r) => !r.demo),
     ];
     final byId = <String, RoadReport>{};
     for (final r in values) {
-      if (r.isActive && !muted.contains(r.type)) byId[r.id] = r;
+      if (r.isActive && !r.demo && !muted.contains(r.type)) byId[r.id] = r;
     }
     return byId.values.toList()..sort((a, b) => b.createdAt.compareTo(a.createdAt));
   }
