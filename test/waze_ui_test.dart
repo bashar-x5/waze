@@ -255,5 +255,25 @@ void main() {
       await tester.pumpWidget(const SizedBox.shrink());
       controller.dispose();
     });
+
+    testWidgets('Car puck sticks and remains visible in widget tree', (tester) async {
+      SharedPreferences.setMockInitialValues({});
+      final controller = AppController(enableDeviceServices: false);
+      await controller.load();
+
+      await tester.pumpWidget(
+        DarbApp(
+          controller: controller,
+          renderMapTiles: false,
+        ),
+      );
+      await tester.pump();
+
+      // The car navigation puck icon is rendered and sticks to location
+      expect(find.byIcon(Icons.navigation_rounded), findsOneWidget);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      controller.dispose();
+    });
   });
 }

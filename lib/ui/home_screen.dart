@@ -39,6 +39,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   bool _is3D = false;
   bool _wasNavigating = false;
   bool _mapReady = false;
+  Offset? _puckScreenOffset;
 
   late final AnimationController _pulseController;
   late final Animation<double> _pulseAnimation;
@@ -228,10 +229,30 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         bearing: (_headingUp && c.navigating) ? c.heading : 0.0,
         tilt: _is3D ? 60.0 : 0.0,
       );
+    } else {
+      _syncPuckScreenPosition();
     }
 
     // Update route and marker overlays
     _updateMapOverlays();
+  }
+
+  Future<void> _syncPuckScreenPosition() async {
+    if (_mapController == null || !mounted) return;
+    if (_followUser) {
+      if (_puckScreenOffset != null) {
+        setState(() => _puckScreenOffset = null);
+      }
+      return;
+    }
+    try {
+      final point = await _mapController!.toScreenLocation(_toMapLibre(widget.controller.position));
+      if (mounted) {
+        setState(() {
+          _puckScreenOffset = Offset(point.x.toDouble(), point.y.toDouble());
+        });
+      }
+    } catch (_) {}
   }
 
   void _animateCamera({
@@ -257,7 +278,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   void _recenter() {
     final c = widget.controller;
-    setState(() => _followUser = true);
+    setState(() {
+      _followUser = true;
+      _puckScreenOffset = null;
+    });
     if (c.navigating) {
       _animateCamera(
         target: _toMapLibre(c.position),
@@ -530,6 +554,36 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       await controller.clearLines();
       await controller.clearCircles();
 
+      // Render native user location puck directly on MapLibre OpenGL canvas
+      // This guarantees the cursor is permanently anchored to the user's geographic coordinates,
+      // sticking to the road even when dragging or rotating the map with fingers!
+      await controller.addCircle(
+        CircleOptions(
+          geometry: _toMapLibre(c.position),
+          circleColor: '#00C8F8',
+          circleRadius: 18.0,
+          circleOpacity: 0.30,
+        ),
+      );
+      await controller.addCircle(
+        CircleOptions(
+          geometry: _toMapLibre(c.position),
+          circleColor: '#FFFFFF',
+          circleRadius: 11.0,
+          circleStrokeColor: '#007AFF',
+          circleStrokeWidth: 3.5,
+          circleOpacity: 1.0,
+        ),
+      );
+      await controller.addCircle(
+        CircleOptions(
+          geometry: _toMapLibre(c.position),
+          circleColor: '#007AFF',
+          circleRadius: 5.5,
+          circleOpacity: 1.0,
+        ),
+      );
+
       // Render saved parked car indicator on map
       if (c.parkedLocation != null) {
         await controller.addCircle(
@@ -577,50 +631,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         );
       }
 
-      if (c.routes.isEmpty) {
-        // Render Baghdad arterial corridor traffic flow lines when exploring the map
-        for (final corridor in baghdadTrafficCorridors) {
-          if (corridor.pathPoints.length < 2) continue;
-          String colorHex;
-          switch (corridor.severity) {
-            case TrafficCongestionLevel.standstill:
-              colorHex = '#FF3D00'; // Standstill red
-              break;
-            case TrafficCongestionLevel.heavy:
-              colorHex = '#FF9100'; // Heavy orange
-              break;
-            case TrafficCongestionLevel.moderate:
-              colorHex = '#FFD600'; // Moderate yellow
-              break;
-            case TrafficCongestionLevel.free:
-              colorHex = '#00E676'; // Free flow green
-              break;
-          }
-
-          final coords = corridor.pathPoints.map(_toMapLibre).toList();
-          // High-contrast casing line
-          await controller.addLine(
-            LineOptions(
-              geometry: coords,
-              lineColor: '#0A0E14',
-              lineWidth: 7.0,
-              lineOpacity: 0.75,
-              lineJoin: 'round',
-            ),
-          );
-          // Core colored traffic line
-          await controller.addLine(
-            LineOptions(
-              geometry: coords,
-              lineColor: colorHex,
-              lineWidth: 4.5,
-              lineOpacity: 0.95,
-              lineJoin: 'round',
-            ),
-          );
-        }
-        return;
-      }
+      if (c.routes.isEmpty) return;
 
       // 1. Render alternative routes underneath
       for (var i = 0; i < c.routes.length; i++) {
@@ -682,7 +693,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 hexColor = '#FF9500'; // Amber
                 break;
               case TrafficCongestionLevel.free:
-                hexColor = '#00E676'; // Vibrant green
+                hexColor = null;
                 break;
             }
             if (hexColor != null) {
@@ -732,11 +743,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   ),
           ),
 
-          // Car Puck Widget Overlay (positioned at screen center when following)
-          if (_followUser)
-            Center(
-              child: _buildCarPuck(c),
-            ),
+          // Car Puck Widget Overlay (sticks to user location whether following or panning)
+          _buildPositionedCarPuck(c),
 
           // Top Nav HUD (Visible when navigating)
           if (c.navigating && c.route != null && c.progress != null)
@@ -1311,6 +1319,50 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             ),
           ),
 
+          // Floating Recenter Pill when map is panned away from location
+          if (!_followUser)
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: c.navigating ? 140 : 190,
+              child: Center(
+                child: Material(
+                  elevation: 8,
+                  borderRadius: BorderRadius.circular(24),
+                  color: dark ? const Color(0xFF1E2835) : Colors.white,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(24),
+                    onTap: _recenter,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(24),
+                        border: Border.all(color: WazeColors.cyan, width: 1.5),
+                        boxShadow: const [
+                          BoxShadow(color: Colors.black26, blurRadius: 10, offset: Offset(0, 4)),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.my_location_rounded, color: WazeColors.cyan, size: 20),
+                          const SizedBox(width: 8),
+                          Text(
+                            arabic ? 'إعادة التوسيط على موقعي' : 'Recenter to my location',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              color: dark ? Colors.white : Colors.black87,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
           // Bottom Navigation & Search Panel
           Positioned(
             left: 0,
@@ -1335,12 +1387,23 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
     return Listener(
       onPointerMove: (e) {
-        if (e.delta.distanceSquared > 12) {
+        if (e.delta.distanceSquared > 6) {
           if (_followUser) {
-            setState(() => _followUser = false);
+            final size = MediaQuery.of(context).size;
+            setState(() {
+              _followUser = false;
+              _puckScreenOffset = Offset(size.width / 2, size.height / 2);
+            });
+          }
+          if (_puckScreenOffset != null) {
+            setState(() {
+              _puckScreenOffset = _puckScreenOffset! + e.delta;
+            });
           }
         }
       },
+      onPointerUp: (_) => _syncPuckScreenPosition(),
+      onPointerCancel: (_) => _syncPuckScreenPosition(),
       child: MapLibreMap(
         key: ValueKey('maplibre_${c.satellite}_$dark'),
         styleString: styleUrl,
@@ -1354,7 +1417,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         onStyleLoadedCallback: _onStyleLoaded,
         onMapLongClick: _onMapLongPress,
         onCameraIdle: () {
-          // Camera finished moving
+          _syncPuckScreenPosition();
         },
         trackCameraPosition: true,
         myLocationEnabled: false,
@@ -1368,6 +1431,21 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         attributionButtonPosition: AttributionButtonPosition.bottomLeft,
         attributionButtonMargins: const Point(8, 8),
       ),
+    );
+  }
+
+  /// Build positioned car puck widget (anchored to user location on screen)
+  Widget _buildPositionedCarPuck(AppController c) {
+    if (_followUser || _puckScreenOffset == null) {
+      return Center(
+        child: _buildCarPuck(c),
+      );
+    }
+
+    return Positioned(
+      left: _puckScreenOffset!.dx - 34,
+      top: _puckScreenOffset!.dy - 34,
+      child: _buildCarPuck(c),
     );
   }
 

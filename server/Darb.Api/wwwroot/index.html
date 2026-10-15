@@ -516,58 +516,6 @@
       height: 100%;
     }
 
-    .map-overlay-badge {
-      position: absolute;
-      bottom: 20px;
-      right: 20px;
-      z-index: 800;
-      background: rgba(10, 14, 20, 0.85);
-      backdrop-filter: blur(12px);
-      border: 1px solid var(--border-color);
-      border-radius: 12px;
-      padding: 10px 16px;
-      font-size: 11px;
-      font-weight: 700;
-      color: var(--text-muted);
-      display: flex;
-      align-items: center;
-      gap: 14px;
-    }
-
-    .map-overlay-badge span {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    .legend-color {
-      width: 12px;
-      height: 4px;
-      border-radius: 2px;
-    }
-
-    /* Traffic Line Speed Pill Badges */
-    .traffic-speed-badge-marker {
-      background: transparent !important;
-      border: none !important;
-    }
-    .traffic-speed-pill {
-      font-family: var(--mono);
-      font-weight: 800;
-      font-size: 10px;
-      padding: 2px 7px;
-      border-radius: 10px;
-      border: 1.5px solid #FFFFFF;
-      box-shadow: 0 0 10px rgba(0, 0, 0, 0.7);
-      white-space: nowrap;
-      text-align: center;
-      cursor: pointer;
-      display: inline-block;
-      transition: transform 0.15s ease;
-    }
-    .traffic-speed-pill:hover {
-      transform: scale(1.15);
-    }
 
     /* Leaflet popup dark theme */
     .leaflet-popup-content-wrapper {
@@ -950,15 +898,6 @@
     <!-- Main Map View -->
     <div class="map-container">
       <div id="map"></div>
-
-      <!-- Map Legend Overlay -->
-      <div class="map-overlay-badge" id="traffic-legend-hud">
-        <span><span class="legend-color" style="background: #00E676;"></span> <b id="lbl-leg-free">انسيابي (&gt; 60 كم/س)</b></span>
-        <span><span class="legend-color" style="background: #FFD600;"></span> <b id="lbl-leg-mod">تباطؤ (40-60 كم/س)</b></span>
-        <span><span class="legend-color" style="background: #FF9100;"></span> <b id="lbl-leg-hvy">مزدحم (20-40 كم/س)</b></span>
-        <span><span class="legend-color" style="background: #FF3D00;"></span> <b id="lbl-leg-jam">توقف (&lt; 20 كم/س)</b></span>
-        <span style="border-right: 1px solid rgba(255,255,255,0.2); padding-right: 10px; margin-right: 4px; color: var(--primary); font-family: var(--mono); font-size: 10px;">🛰️ TomTom Flow PostGIS</span>
-      </div>
     </div>
   </main>
 
@@ -1018,149 +957,13 @@
   <script>
     // State & Config
     let isArabic = true;
-    let map, markersLayer, trafficLayer;
+    let map, markersLayer;
     let currentTab = 'incidents';
 
     // Baghdad coordinates
     const BAGHDAD_CENTER = [33.3152, 44.3661];
 
-    // Baghdad Arterial Traffic Corridors Geometries
-    const BAGHDAD_CORRIDORS = {
-      'corridor_qasim': {
-        key: 'corridor_qasim',
-        nameAr: 'طريق محمد القاسم للمرور السريع',
-        nameEn: 'Muhammad Al-Qasim Expressway',
-        baseSpeed: 80,
-        coords: [
-          [33.3950, 44.3680],
-          [33.3820, 44.3780],
-          [33.3650, 44.3900],
-          [33.3480, 44.4050],
-          [33.3350, 44.4170],
-          [33.3220, 44.4280],
-          [33.3050, 44.4450],
-          [33.2880, 44.4600]
-        ]
-      },
-      'corridor_14july': {
-        key: 'corridor_14july',
-        nameAr: 'شارع 14 تموز (المنطقة الخضراء - الكرخ)',
-        nameEn: '14th of July Highway',
-        baseSpeed: 60,
-        coords: [
-          [33.3400, 44.3820],
-          [33.3250, 44.3850],
-          [33.3100, 44.3840],
-          [33.2950, 44.3820],
-          [33.2750, 44.3800]
-        ]
-      },
-      'corridor_matar': {
-        key: 'corridor_matar',
-        nameAr: 'طريق مطار بغداد الدولي',
-        nameEn: 'Baghdad Airport Road',
-        baseSpeed: 90,
-        coords: [
-          [33.2980, 44.3650],
-          [33.2900, 44.3500],
-          [33.2820, 44.3250],
-          [33.2750, 44.3000],
-          [33.2680, 44.2750],
-          [33.2600, 44.2500],
-          [33.2550, 44.2320]
-        ]
-      },
-      'corridor_jadriya': {
-        key: 'corridor_jadriya',
-        nameAr: 'جسر الجادرية ومجمع الكليات',
-        nameEn: 'Al-Jadriya Bridge & University Corridor',
-        baseSpeed: 50,
-        coords: [
-          [33.2720, 44.3600],
-          [33.2750, 44.3700],
-          [33.2800, 44.3820],
-          [33.2850, 44.3950],
-          [33.2880, 44.4080]
-        ]
-      },
-      'corridor_jumhuriya': {
-        key: 'corridor_jumhuriya',
-        nameAr: 'جسر الجمهورية وساحة التحرير',
-        nameEn: 'Al-Jumhuriya Bridge & Tahrir Square',
-        baseSpeed: 45,
-        coords: [
-          [33.3210, 44.3920],
-          [33.3250, 44.3980],
-          [33.3270, 44.4030],
-          [33.3290, 44.4080],
-          [33.3300, 44.4150]
-        ]
-      },
-      'corridor_senak': {
-        key: 'corridor_senak',
-        nameAr: 'جسر السنك وباب الشرقي',
-        nameEn: 'Al-Senak Bridge & Bab Al-Sharqi',
-        baseSpeed: 40,
-        coords: [
-          [33.3290, 44.3900],
-          [33.3320, 44.3950],
-          [33.3340, 44.3990],
-          [33.3360, 44.4040],
-          [33.3380, 44.4090]
-        ]
-      },
-      'corridor_sarafiya': {
-        key: 'corridor_sarafiya',
-        nameAr: 'جسر الصرافية وباب المعظم',
-        nameEn: 'Al-Sarafiya Bridge & Bab Al-Muadham',
-        baseSpeed: 50,
-        coords: [
-          [33.3510, 44.3720],
-          [33.3550, 44.3800],
-          [33.3560, 44.3880],
-          [33.3580, 44.3950],
-          [33.3600, 44.4030]
-        ]
-      },
-      'corridor_mansour': {
-        key: 'corridor_mansour',
-        nameAr: 'شارع 14 رمضان (المنصور)',
-        nameEn: '14 Ramadan Street (Al-Mansour)',
-        baseSpeed: 45,
-        coords: [
-          [33.3080, 44.3620],
-          [33.3150, 44.3550],
-          [33.3220, 44.3480],
-          [33.3300, 44.3400]
-        ]
-      },
-      'corridor_palestine': {
-        key: 'corridor_palestine',
-        nameAr: 'شارع فلسطين وساحة بيروت',
-        nameEn: 'Palestine Street & Beirut Square',
-        baseSpeed: 50,
-        coords: [
-          [33.3650, 44.4050],
-          [33.3550, 44.4150],
-          [33.3450, 44.4250],
-          [33.3350, 44.4350],
-          [33.3250, 44.4450]
-        ]
-      },
-      'corridor_karrada': {
-        key: 'corridor_karrada',
-        nameAr: 'شارع الكرادة داخل وساحة كهرمانة',
-        nameEn: 'Al-Karrada Dakhil & Kahramana',
-        baseSpeed: 35,
-        coords: [
-          [33.3200, 44.4200],
-          [33.3100, 44.4220],
-          [33.3000, 44.4200],
-          [33.2900, 44.4120],
-          [33.2820, 44.4000]
-        ]
-      }
-    };
+
 
     // Tab switcher
     function switchTab(tabId) {
@@ -1230,8 +1033,7 @@
       // Default to Darb Dark
       darbDarkGroup.addTo(map);
 
-      // Dedicated Overlays for Traffic Lines and Incidents/Vehicles
-      trafficLayer = L.layerGroup().addTo(map);
+      // Dedicated Overlays for Incidents and Active Devices
       markersLayer = L.layerGroup().addTo(map);
 
       // Interactive Layer Switcher
@@ -1242,7 +1044,6 @@
         "☀️ شوارع نهارية (OSM Day)": osmDayLayer
       };
       const overlays = {
-        "🚦 خطوط حركة المرور المباشرة (Live Traffic Lines)": trafficLayer,
         "📍 البلاغات والأجهزة (Incidents & Devices)": markersLayer
       };
       L.control.layers(baseLayers, overlays, { position: 'topright' }).addTo(map);
@@ -1707,106 +1508,7 @@
       // Update map markers
       markersLayer.clearLayers();
 
-      // Clear traffic polylines and incident markers
-      if (trafficLayer) trafficLayer.clearLayers();
 
-      // Render continuous highway traffic lines & speed badges across Baghdad corridors
-      const segmentsByKey = {};
-      if (data.congestionSegments && data.congestionSegments.length > 0) {
-        data.congestionSegments.forEach(s => {
-          segmentsByKey[s.segmentKey] = s;
-        });
-      }
-
-      Object.keys(BAGHDAD_CORRIDORS).forEach(key => {
-        const corridor = BAGHDAD_CORRIDORS[key];
-        const seg = segmentsByKey[key];
-
-        let speed = corridor.baseSpeed;
-        let normalSpeed = corridor.baseSpeed;
-        let delaySec = 0;
-        let lvl = 'free';
-
-        if (seg) {
-          speed = seg.averageSpeedKmh || corridor.baseSpeed;
-          normalSpeed = seg.normalSpeedKmh || corridor.baseSpeed;
-          delaySec = seg.delaySeconds || 0;
-          lvl = String(seg.congestionLevel ?? '').toLowerCase();
-        }
-
-        let color = '#00E676';
-        let levelAr = 'انسيابية ممتازة';
-        let levelEn = 'Free Flow';
-
-        if (lvl === 'standstill' || lvl === 'congested' || lvl === '3' || speed < 20) {
-          color = '#FF3D00'; levelAr = 'توقف تام / شلل'; levelEn = 'Standstill / Jam';
-        } else if (lvl === 'heavy' || lvl === '2' || speed < 40) {
-          color = '#FF9100'; levelAr = 'ازدحام ملحوظ'; levelEn = 'Heavy Delay';
-        } else if (lvl === 'moderate' || lvl === '1' || speed < 60) {
-          color = '#FFD600'; levelAr = 'تباطؤ طفيف'; levelEn = 'Moderate Flow';
-        }
-
-        const roadTitle = isArabic ? corridor.nameAr : corridor.nameEn;
-        const speedText = Math.round(speed) + ' ' + (isArabic ? 'كم/س' : 'km/h');
-        const normalText = Math.round(normalSpeed) + ' ' + (isArabic ? 'كم/س' : 'km/h');
-        const delayText = delaySec > 0 ? (Math.round(delaySec / 60) + ' ' + (isArabic ? 'دقيقة' : 'min')) : (isArabic ? 'انسيابي' : 'None');
-
-        const popupContent = `
-          <div style="font-family: inherit; direction: ${isArabic ? 'rtl' : 'ltr'}; padding: 6px; min-width: 220px;">
-            <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.12); padding-bottom: 5px; margin-bottom: 6px;">
-              <b style="font-size: 13px; color: ${color}; display: flex; align-items: center; gap: 4px;">🚦 ${roadTitle}</b>
-              <span style="background: ${color}25; color: ${color}; border: 1px solid ${color}66; padding: 2px 6px; border-radius: 8px; font-size: 10px; font-weight: 800;">${isArabic ? levelAr : levelEn}</span>
-            </div>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px; font-size: 11px; background: rgba(255,255,255,0.03); padding: 6px; border-radius: 6px; margin-bottom: 6px;">
-              <div>⚡ ${isArabic ? 'السرعة الحالية:' : 'Current Speed:'} <b style="color: ${color};">${speedText}</b></div>
-              <div>🎯 ${isArabic ? 'السرعة القياسية:' : 'Freeflow Speed:'} <b>${normalText}</b></div>
-              <div>⏳ ${isArabic ? 'التأخير المتوقع:' : 'Traffic Delay:'} <b style="color: ${delaySec > 0 ? '#FFA000' : '#00E676'};">${delayText}</b></div>
-              <div>📡 ${isArabic ? 'المصدر:' : 'Source:'} <b>TomTom Flow</b></div>
-            </div>
-            <div style="font-size: 9px; color: var(--text-muted); text-align: ${isArabic ? 'left' : 'right'}; font-family: var(--mono);">
-              PostGIS 5m Live Harvest Cache
-            </div>
-          </div>
-        `;
-
-        if (trafficLayer) {
-          // 1. High-contrast dark casing polyline
-          L.polyline(corridor.coords, {
-            color: '#0A0E14',
-            weight: 8,
-            opacity: 0.85,
-            lineCap: 'round',
-            lineJoin: 'round'
-          }).addTo(trafficLayer);
-
-          // 2. Core glowing traffic flow polyline
-          L.polyline(corridor.coords, {
-            color: color,
-            weight: 5,
-            opacity: 0.95,
-            lineCap: 'round',
-            lineJoin: 'round'
-          }).bindPopup(popupContent).addTo(trafficLayer);
-
-          // 3. Speed pill marker at corridor midpoint
-          const midIdx = Math.floor(corridor.coords.length / 2);
-          const midPoint = corridor.coords[midIdx];
-          const pillIcon = L.divIcon({
-            html: `
-              <div class="traffic-speed-pill" style="background: ${color}; color: #000;">
-                ${Math.round(speed)} كم/س
-              </div>
-            `,
-            className: 'traffic-speed-badge-marker',
-            iconSize: [60, 22],
-            iconAnchor: [30, 11]
-          });
-
-          L.marker(midPoint, { icon: pillIcon })
-            .bindPopup(popupContent)
-            .addTo(trafficLayer);
-        }
-      });
 
       // Render incidents and speed bump warnings on map
       if (data.recentIncidents) {
@@ -2032,15 +1734,6 @@
       const searchInp = document.getElementById('user-search-input');
       if (searchInp) searchInp.placeholder = isArabic ? '🔍 بحث عن جهاز، موديل، أو معرف...' : '🔍 Search device, model, or ID...';
 
-      // Traffic Legend HUD bilingual
-      const legFree = document.getElementById('lbl-leg-free');
-      if (legFree) legFree.innerText = isArabic ? 'انسيابي (> 60 كم/س)' : 'Free (> 60 km/h)';
-      const legMod = document.getElementById('lbl-leg-mod');
-      if (legMod) legMod.innerText = isArabic ? 'تباطؤ (40-60 كم/س)' : 'Moderate (40-60 km/h)';
-      const legHvy = document.getElementById('lbl-leg-hvy');
-      if (legHvy) legHvy.innerText = isArabic ? 'مزدحم (20-40 كم/س)' : 'Heavy (20-40 km/h)';
-      const legJam = document.getElementById('lbl-leg-jam');
-      if (legJam) legJam.innerText = isArabic ? 'توقف (< 20 كم/س)' : 'Standstill (< 20 km/h)';
 
       renderFilteredUsers();
     }
