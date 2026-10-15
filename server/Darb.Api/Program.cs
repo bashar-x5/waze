@@ -2,6 +2,7 @@ using Darb.Api.Data;
 using Darb.Api.Models;
 using Darb.Api.Services;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -49,7 +50,14 @@ var app = builder.Build();
 
 app.UseCors("AllowAll");
 app.UseDefaultFiles();
-app.UseStaticFiles();
+
+var contentTypeProvider = new FileExtensionContentTypeProvider();
+contentTypeProvider.Mappings[".apk"] = "application/vnd.android.package-archive";
+app.UseStaticFiles(new StaticFileOptions
+{
+    ContentTypeProvider = contentTypeProvider,
+    ServeUnknownFileTypes = true
+});
 
 if (app.Environment.IsDevelopment())
 {
@@ -263,6 +271,26 @@ app.MapPost("/api/traffic/harvest", async (
 
 app.MapGet("/dashboard", () => Results.Redirect("/index.html"))
    .WithName("DashboardRedirect");
+
+app.MapGet("/darb.apk", (IWebHostEnvironment env) =>
+{
+    var candidates = new[]
+    {
+        Path.Combine(env.WebRootPath ?? "wwwroot", "darb.apk"),
+        Path.Combine(AppContext.BaseDirectory, "wwwroot", "darb.apk"),
+        "/app/wwwroot/darb.apk",
+        "wwwroot/darb.apk"
+    };
+
+    var found = candidates.FirstOrDefault(File.Exists);
+    if (found == null)
+    {
+        return Results.NotFound(new { error = "Darb APK file not found on server." });
+    }
+
+    return Results.File(found, "application/vnd.android.package-archive", "darb.apk");
+})
+.WithName("DownloadDarbApk");
 
 app.MapGet("/api/dashboard/stats", async (
     DarbDbContext db,
