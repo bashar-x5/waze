@@ -21,6 +21,7 @@ This document provides complete operational, architectural, and development cont
 - **Server Stack**: ASP.NET Core 9 Minimal API (server/Darb.Api), PostgreSQL 16 + PostGIS, Docker, systemd.
 - **TomTom Traffic Harvester**: Runs server-side (TrafficAggregationWorker.cs and TomTomTrafficHarvester.cs), harvesting Baghdad's 8 major corridors every 5 minutes into PostGIS. Client queries /api/traffic/conditions directly from this local database, never consuming external API quotas on user devices.
 - **SSH Access**: ssh -i <a> ubuntu@139.185.47.123 (Private key file  is stored locally and excluded in .gitignore).
+- **Live Container**: Web and API run inside Docker container darb-api.
 
 ---
 
@@ -60,11 +61,16 @@ flutter build apk --release
 `
 *Output binary located at uild/app/outputs/flutter-apk/app-release.apk.*
 
-### 4. Deploy APK to Server
+### 4. Deploy APK & Web Updates to Server
 `ash
-# Copy to root and upload to production server
+# Upload APK to host and copy into running container
 Copy-Item -Path 'build\app\outputs\flutter-apk\app-release.apk' -Destination 'Darb-release.apk' -Force
 scp -i a build/app/outputs/flutter-apk/app-release.apk ubuntu@139.185.47.123:/home/ubuntu/darb/server/Darb.Api/wwwroot/darb.apk
+ssh -i a ubuntu@139.185.47.123 sudo docker cp /home/ubuntu/darb/server/Darb.Api/wwwroot/darb.apk darb-api:/app/wwwroot/darb.apk
+
+# Upload web dashboard index.html into running container
+scp -i a server/Darb.Api/wwwroot/index.html ubuntu@139.185.47.123:/home/ubuntu/darb/server/Darb.Api/wwwroot/index.html
+ssh -i a ubuntu@139.185.47.123 sudo docker cp /home/ubuntu/darb/server/Darb.Api/wwwroot/index.html darb-api:/app/wwwroot/index.html
 `
 
 ---
