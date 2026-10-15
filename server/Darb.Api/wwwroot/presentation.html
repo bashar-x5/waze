@@ -1219,25 +1219,112 @@
     </button>
   </div>
 
+  <!-- Presentation Narration Audio Elements -->
+  <audio id="slide-audio" preload="auto"></audio>
+  <audio id="cmd-audio" preload="auto"></audio>
+
   <script>
     const TOTAL_SLIDES = 7;
     let currentSlide = 0;
     let isAutoPlay = true;
     let isSpeechEnabled = false;
-    let slideTimer = null;
-    let progressInterval = null;
     let progressPercent = 0;
     const SLIDE_DURATION = 9000; // 9 seconds per slide
 
     const speechTexts = [
       "أهلاً بكم في تطبيق دَرب، نظام الملاحة الذكي والمجتمعي الأول في العراق، مجاني مئة بالمئة وبدون أي تكاليف سحابية.",
-      "استمتع بعرض القمر الصناعي الحقيقي ثلاثي الأبعاد المدمج مع مجسمات المباني، لتحاكي شوارع بغداد بدقة متناهية.",
+      "استمتع بعرض القمر الصناعي الحقيقي ثلاثي الأبعاد المدمج مع مجسمات المباني، لتحاكي شوارع بغداد بدقة متناهية وبدون أي اشتراكات.",
       "ملاحة صوتية متطورة تفهم اللهجة العراقية، فقط قل: اريد الذهاب لمطعم رويال كالاكسي في المنصور، وسينطلق التوجيه فوراً.",
-      "دعم متكامل لشاشات السيارات أندرويد أوتو، مع لوحة إرشادات علوية وتحكم بأزرار المقود.",
-      "رصد مباشر ومجتمعي للمخاطر، مع نظام ذكي لاعتماد المطبات الاصطناعية وتنبيهك قبل مئتي متر لحماية سيارتك.",
-      "مساعد ذكي لتذكر مكان ركن السيارة في المولات مع بوصلة مشي ترشدك خطوة بخطوة للعودة إليها.",
+      "دعم متكامل لشاشات السيارات أندرويد أوتو، مع لوحة إرشادات علوية وتحكم مباشر بأزرار المقود لقيادة آمنة.",
+      "رصد مباشر ومجتمعي للمخاطر، مع نظام ذكي لاعتماد المطبات الاصطناعية وتنبيهك صوتياً قبل مئتي متر لحماية سيارتك.",
+      "مساعد ذكي لحفظ مكان ركن السيارة في المواقف والمولات، مع بوصلة مشي ترشدك خطوة بخطوة للعودة إليها.",
       "خادم عمليات متكامل ومباشر، مع إمكانية التحميل الفوري لملف التطبيق ورمز كيو آر دائم لا تنتهي صلاحيته."
     ];
+
+    // Preload audio files
+    const audioCache = [];
+    for (let i = 0; i < TOTAL_SLIDES; i++) {
+      const a = new Audio();
+      a.src = `/audio/slide_${i}.mp3`;
+      a.preload = 'auto';
+      audioCache.push(a);
+    }
+
+    // Web Audio API for Chimes & Audio Hardware Activation
+    let audioCtx = null;
+    function playChime(freq1 = 523, freq2 = 659, freq3 = 784) {
+      try {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContext) return;
+        if (!audioCtx) audioCtx = new AudioContext();
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+
+        const now = audioCtx.currentTime;
+        [freq1, freq2, freq3].forEach((f, idx) => {
+          if (!f) return;
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(f, now + idx * 0.08);
+          gain.gain.setValueAtTime(0.08, now + idx * 0.08);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.08 + 0.25);
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+          osc.start(now + idx * 0.08);
+          osc.stop(now + idx * 0.08 + 0.25);
+        });
+      } catch (e) {
+        console.warn("Chime error:", e);
+      }
+    }
+
+    // TTS Voice Fallback Discovery
+    let arabicVoice = null;
+    function setupVoices() {
+      if (!('speechSynthesis' in window)) return;
+      const voices = window.speechSynthesis.getVoices();
+      if (!voices || voices.length === 0) return;
+      arabicVoice = voices.find(v => v.lang && (v.lang.startsWith('ar') || v.lang.includes('Arabic'))) ||
+                    voices.find(v => v.name && v.name.toLowerCase().includes('arabic'));
+    }
+    if ('speechSynthesis' in window) {
+      setupVoices();
+      window.speechSynthesis.onvoiceschanged = setupVoices;
+    }
+
+    function fallbackSpeech(text) {
+      if (!('speechSynthesis' in window)) return;
+      try {
+        window.speechSynthesis.cancel();
+        const u = new SpeechSynthesisUtterance(text);
+        if (arabicVoice) {
+          u.voice = arabicVoice;
+          u.lang = arabicVoice.lang;
+        } else {
+          u.lang = 'ar-SA';
+        }
+        u.rate = 0.95;
+        window.speechSynthesis.speak(u);
+      } catch (e) {
+        console.warn("TTS fallback error:", e);
+      }
+    }
+
+    function playSlideAudio(index) {
+      const slideAudio = document.getElementById('slide-audio');
+      if (!slideAudio) return;
+      slideAudio.pause();
+      slideAudio.src = `/audio/slide_${index}.mp3`;
+      slideAudio.currentTime = 0;
+      
+      const p = slideAudio.play();
+      if (p !== undefined) {
+        p.catch(err => {
+          console.warn("MP3 play failed, falling back to TTS:", err);
+          fallbackSpeech(speechTexts[index]);
+        });
+      }
+    }
 
     function showSlide(index) {
       if (index < 0) index = 0;
@@ -1252,21 +1339,16 @@
         d.classList.toggle('active', idx === currentSlide);
       });
 
-      // Reset & restart progress bar
+      // Reset progress bar
       progressPercent = 0;
-      document.getElementById('progress-bar').style.width = '0%';
+      const pBar = document.getElementById('progress-bar');
+      if (pBar) pBar.style.width = '0%';
 
-      // Scroll window to top on mobile so next slide starts from header
       window.scrollTo({ top: 0, behavior: 'smooth' });
 
-      // Speak narration if enabled
-      if (isSpeechEnabled && 'speechSynthesis' in window) {
-        window.speechSynthesis.cancel();
-        const text = speechTexts[currentSlide];
-        const utterance = new SpeechSynthesisUtterance(text);
-        utterance.lang = 'ar-IQ';
-        utterance.rate = 0.95;
-        window.speechSynthesis.speak(utterance);
+      // Play narration audio if enabled
+      if (isSpeechEnabled) {
+        playSlideAudio(currentSlide);
       }
     }
 
@@ -1294,6 +1376,8 @@
 
     function toggleSpeech() {
       isSpeechEnabled = !isSpeechEnabled;
+      playChime(659, 880); // Audible confirmation
+
       const icon = isSpeechEnabled ? '🔇' : '🔊';
       const text = isSpeechEnabled ? 'كتم الصوت' : 'تشغيل الصوت';
       document.getElementById('sound-icon').innerText = icon;
@@ -1301,22 +1385,43 @@
       const mIcon = document.getElementById('sound-icon-mobile');
       if (mIcon) mIcon.innerText = icon;
 
+      const slideAudio = document.getElementById('slide-audio');
       if (isSpeechEnabled) {
-        showSlide(currentSlide);
-      } else if ('speechSynthesis' in window) {
-        window.speechSynthesis.cancel();
+        playSlideAudio(currentSlide);
+      } else {
+        if (slideAudio) slideAudio.pause();
+        if ('speechSynthesis' in window) window.speechSynthesis.cancel();
       }
     }
 
     function simulateVoiceCommand() {
-      if ('speechSynthesis' in window) {
-        window.speechSynthesis.cancel();
-        const u = new SpeechSynthesisUtterance("اريد الذهاب لمطعم رويال كالاكسي في المنصور");
-        u.lang = 'ar-IQ';
-        u.rate = 0.9;
-        window.speechSynthesis.speak(u);
+      playChime(440, 880); // Voice trigger chime
+      const cmdAudio = document.getElementById('cmd-audio');
+      if (cmdAudio) {
+        cmdAudio.src = '/audio/voice_cmd.mp3';
+        cmdAudio.currentTime = 0;
+        const p = cmdAudio.play();
+        if (p !== undefined) {
+          p.catch(() => fallbackSpeech("اريد الذهاب لمطعم رويال كالاكسي في المنصور"));
+        }
+      } else {
+        fallbackSpeech("اريد الذهاب لمطعم رويال كالاكسي في المنصور");
       }
     }
+
+    // Advance slide when audio ends if in autoplay
+    window.addEventListener('DOMContentLoaded', () => {
+      const slideAudio = document.getElementById('slide-audio');
+      if (slideAudio) {
+        slideAudio.onended = () => {
+          if (isAutoPlay && isSpeechEnabled) {
+            setTimeout(() => {
+              if (isAutoPlay && isSpeechEnabled) nextSlide();
+            }, 1200);
+          }
+        };
+      }
+    });
 
     // Touch Swipe Gesture Support for Mobile
     let touchStartX = 0;
@@ -1338,13 +1443,10 @@
     function handleSwipe() {
       const diffX = touchEndX - touchStartX;
       const diffY = touchEndY - touchStartY;
-      // Ensure horizontal swipe is dominant
       if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 40) {
         if (diffX > 0) {
-          // Swiped right (in RTL: previous slide)
           prevSlide();
         } else {
-          // Swiped left (in RTL: next slide)
           nextSlide();
         }
       }
@@ -1353,10 +1455,18 @@
     // Timer Loop
     setInterval(() => {
       if (!isAutoPlay) return;
-      progressPercent += (100 / (SLIDE_DURATION / 100));
-      if (progressPercent >= 100) {
-        progressPercent = 0;
-        nextSlide();
+      // If voice is speaking, let the audio onended event drive slide transition
+      const slideAudio = document.getElementById('slide-audio');
+      if (isSpeechEnabled && slideAudio && !slideAudio.paused && !slideAudio.ended) {
+        if (slideAudio.duration) {
+          progressPercent = (slideAudio.currentTime / slideAudio.duration) * 100;
+        }
+      } else {
+        progressPercent += (100 / (SLIDE_DURATION / 100));
+        if (progressPercent >= 100) {
+          progressPercent = 0;
+          nextSlide();
+        }
       }
       const pBar = document.getElementById('progress-bar');
       if (pBar) pBar.style.width = Math.min(progressPercent, 100) + '%';
