@@ -1,5 +1,6 @@
 package app.darb.darb
 
+import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.view.WindowManager
@@ -20,15 +21,53 @@ class MainActivity : FlutterActivity() {
         CarBridge.registerWith(flutterEngine.dartExecutor.binaryMessenger)
 
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, DEVICE_CHANNEL).setMethodCallHandler { call, result ->
-            if (call.method == "getHardwareId") {
-                try {
-                    val androidId = Settings.Secure.getString(contentResolver, Settings.Secure.ANDROID_ID)
-                    result.success(androidId ?: "")
-                } catch (e: Exception) {
-                    result.error("ERROR", e.message, null)
+            when (call.method) {
+                "getHardwareId" -> {
+                    try {
+                        val androidId = Settings.Secure.getString(contentResolver, Settings.Secure.ANDROID_ID)
+                        result.success(androidId ?: "")
+                    } catch (e: Exception) {
+                        result.error("ERROR", e.message, null)
+                    }
                 }
-            } else {
-                result.notImplemented()
+                "getDeviceInfo" -> {
+                    try {
+                        val androidId = Settings.Secure.getString(contentResolver, Settings.Secure.ANDROID_ID) ?: ""
+                        val manufacturer = Build.MANUFACTURER ?: ""
+                        val model = Build.MODEL ?: ""
+                        val brand = Build.BRAND ?: ""
+                        val fullModel = if (model.startsWith(manufacturer, ignoreCase = true)) {
+                            model
+                        } else {
+                            "$manufacturer $model".trim()
+                        }
+                        
+                        var userDeviceName = ""
+                        try {
+                            userDeviceName = Settings.Global.getString(contentResolver, "device_name") ?: ""
+                            if (userDeviceName.isEmpty()) {
+                                userDeviceName = Settings.Secure.getString(contentResolver, "bluetooth_name") ?: ""
+                            }
+                        } catch (_: Exception) {}
+
+                        if (userDeviceName.isEmpty()) {
+                            userDeviceName = fullModel
+                        }
+
+                        val osVersion = "Android ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})"
+
+                        result.success(mapOf(
+                            "androidId" to androidId,
+                            "deviceModel" to fullModel,
+                            "deviceName" to userDeviceName,
+                            "osVersion" to osVersion,
+                            "brand" to brand
+                        ))
+                    } catch (e: Exception) {
+                        result.error("ERROR", e.message, null)
+                    }
+                }
+                else -> result.notImplemented()
             }
         }
     }

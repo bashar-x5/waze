@@ -70,6 +70,9 @@ public class TrafficIntelligenceService : ITrafficIntelligenceService
                 user = new DarbUser
                 {
                     UserId = dto.SessionId,
+                    DeviceModel = dto.DeviceModel,
+                    DeviceName = dto.DeviceName,
+                    OsVersion = dto.OsVersion,
                     FirstSeenAt = now,
                     LastSeenAt = now,
                     Status = "active",
@@ -89,6 +92,9 @@ public class TrafficIntelligenceService : ITrafficIntelligenceService
                 user.LastLatitude = dto.Latitude;
                 user.LastLongitude = dto.Longitude;
                 user.LastSpeedKmh = dto.SpeedKmh;
+                if (!string.IsNullOrEmpty(dto.DeviceModel)) user.DeviceModel = dto.DeviceModel;
+                if (!string.IsNullOrEmpty(dto.DeviceName)) user.DeviceName = dto.DeviceName;
+                if (!string.IsNullOrEmpty(dto.OsVersion)) user.OsVersion = dto.OsVersion;
             }
         }
 
@@ -165,6 +171,8 @@ public class TrafficIntelligenceService : ITrafficIntelligenceService
                 user = new DarbUser
                 {
                     UserId = dto.UserId,
+                    DeviceModel = dto.DeviceModel,
+                    DeviceName = dto.DeviceName,
                     FirstSeenAt = now,
                     LastSeenAt = now,
                     ReportCount = 1,
@@ -184,6 +192,8 @@ public class TrafficIntelligenceService : ITrafficIntelligenceService
                 user.LastSeenAt = now;
                 user.LastLatitude = dto.Latitude;
                 user.LastLongitude = dto.Longitude;
+                if (!string.IsNullOrEmpty(dto.DeviceModel)) user.DeviceModel = dto.DeviceModel;
+                if (!string.IsNullOrEmpty(dto.DeviceName)) user.DeviceName = dto.DeviceName;
                 if (user.Status == "trusted") isTrustedUser = true;
             }
         }
@@ -407,6 +417,9 @@ public class TrafficIntelligenceService : ITrafficIntelligenceService
         return users.Select(u => new DarbUserDto
         {
             UserId = u.UserId,
+            DeviceModel = u.DeviceModel,
+            DeviceName = u.DeviceName,
+            OsVersion = u.OsVersion,
             FirstSeenAt = u.FirstSeenAt,
             LastSeenAt = u.LastSeenAt,
             ReportCount = u.ReportCount,

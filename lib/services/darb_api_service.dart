@@ -33,6 +33,9 @@ class DarbApiService {
     double? heading,
     required String sessionId,
     DateTime? observedAt,
+    String? deviceModel,
+    String? deviceName,
+    String? osVersion,
   }) async {
     if (_disposed) return false;
     final uri = Uri.parse('$_baseUrl/api/traffic/observations');
@@ -48,6 +51,9 @@ class DarbApiService {
               'heading': heading,
               'observedAt': (observedAt ?? DateTime.now().toUtc()).toIso8601String(),
               'sessionId': sessionId,
+              if (deviceModel != null && deviceModel.isNotEmpty) 'deviceModel': deviceModel,
+              if (deviceName != null && deviceName.isNotEmpty) 'deviceName': deviceName,
+              if (osVersion != null && osVersion.isNotEmpty) 'osVersion': osVersion,
             }),
           )
           .timeout(const Duration(seconds: 5));
@@ -141,7 +147,12 @@ class DarbApiService {
   }
 
   /// Submits a new user incident report to the backend.
-  Future<bool> reportIncident(RoadReport report, {String? userId}) async {
+  Future<bool> reportIncident(
+    RoadReport report, {
+    String? userId,
+    String? deviceModel,
+    String? deviceName,
+  }) async {
     if (_disposed) return false;
     final uri = Uri.parse('$_baseUrl/api/traffic/incidents');
     try {
@@ -156,6 +167,8 @@ class DarbApiService {
               'longitude': report.point.longitude,
               'description': report.description,
               'userId': userId ?? report.userId,
+              if (deviceModel != null && deviceModel.isNotEmpty) 'deviceModel': deviceModel,
+              if (deviceName != null && deviceName.isNotEmpty) 'deviceName': deviceName,
             }),
           )
           .timeout(const Duration(seconds: 8));

@@ -86,6 +86,13 @@ public class DarbDbContext : DbContext
                             );
                         END IF;
                     END IF;
+
+                    -- Ensure Users table schema includes device columns
+                    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'Users') THEN
+                        ALTER TABLE ""Users"" ADD COLUMN IF NOT EXISTS ""DeviceModel"" TEXT;
+                        ALTER TABLE ""Users"" ADD COLUMN IF NOT EXISTS ""DeviceName"" TEXT;
+                        ALTER TABLE ""Users"" ADD COLUMN IF NOT EXISTS ""OsVersion"" TEXT;
+                    END IF;
                 END $$;
             ", cancellationToken);
         }

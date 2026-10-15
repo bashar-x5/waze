@@ -387,18 +387,37 @@ app.MapGet("/api/dashboard/stats", async (
         .ToListAsync(ct);
 
     // Group by SessionId to return exactly ONE latest position per active vehicle (No duplicate measurements!)
+    var activeSessionIds = recentObservations
+        .Where(o => !string.IsNullOrEmpty(o.SessionId))
+        .Select(o => o.SessionId!)
+        .Distinct()
+        .ToList();
+
+    var activeUsersDict = await db.Users
+        .Where(u => activeSessionIds.Contains(u.UserId))
+        .ToDictionaryAsync(u => u.UserId, ct);
+
     var latestVehicleFixes = recentObservations
         .Where(o => !string.IsNullOrEmpty(o.SessionId))
         .GroupBy(o => o.SessionId)
         .Select(g => g.First())
-        .Select(o => new {
-            userId = o.SessionId,
-            latitude = o.Latitude,
-            longitude = o.Longitude,
-            speedKmh = Math.Round(o.SpeedKmh, 1),
-            heading = Math.Round(o.Heading ?? 0.0, 0),
-            observedAt = o.ObservedAt,
-            lastSeenSecondsAgo = Math.Max(0, (int)(now - o.ReceivedAt).TotalSeconds)
+        .Select(o => {
+            activeUsersDict.TryGetValue(o.SessionId!, out var user);
+            return new {
+                userId = o.SessionId,
+                deviceModel = user?.DeviceModel ?? "Android Device",
+                deviceName = user?.DeviceName ?? user?.DeviceModel ?? "هاتف محمول",
+                osVersion = user?.OsVersion ?? "",
+                status = user?.Status ?? "active",
+                reportCount = user?.ReportCount ?? 0,
+                confirmationCount = user?.ConfirmationCount ?? 0,
+                latitude = o.Latitude,
+                longitude = o.Longitude,
+                speedKmh = Math.Round(o.SpeedKmh, 1),
+                heading = Math.Round(o.Heading ?? 0.0, 0),
+                observedAt = o.ObservedAt,
+                lastSeenSecondsAgo = Math.Max(0, (int)(now - o.ReceivedAt).TotalSeconds)
+            };
         })
         .ToList();
 

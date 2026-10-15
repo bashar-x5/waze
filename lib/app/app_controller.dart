@@ -31,6 +31,9 @@ class AppController extends ChangeNotifier {
   final PlaceSearchService _search;
   final DarbApiService _api;
   String _sessionId = 'MAC-${Random().nextInt(0xFFFFFF).toRadixString(16).padLeft(6, '0').toUpperCase()}';
+  String? _deviceModel;
+  String? _deviceName;
+  String? _osVersion;
   final Set<String> _spokenManeuverSignatures = {};
   final Set<String> _announcedWarningIds = {};
   String? _lastSpokenPhrase;
@@ -46,6 +49,9 @@ class AppController extends ChangeNotifier {
   Timer? _serverIncidentsTimer;
 
   String get userId => _sessionId;
+  String? get deviceModel => _deviceModel;
+  String? get deviceName => _deviceName;
+  String? get osVersion => _osVersion;
   bool _disposed = false;
   int _routeRequest = 0;
   int _searchRequest = 0;
@@ -110,15 +116,38 @@ class AppController extends ChangeNotifier {
     try {
       _prefs = await SharedPreferences.getInstance();
       var savedId = _prefs!.getString('darb.device_user_id.v1');
-      if (savedId == null || savedId.isEmpty) {
-        // First try to fetch real hardware Android ID from device via native platform channel
-        if (enableDeviceServices && defaultTargetPlatform == TargetPlatform.android) {
-          try {
-            const channel = MethodChannel('app.darb.darb/device');
-            final rawId = await channel
-                .invokeMethod<String>('getHardwareId')
-                .timeout(const Duration(milliseconds: 300), onTimeout: () => null);
-            if (rawId != null && rawId.trim().isNotEmpty) {
+      _deviceModel = _prefs!.getString('darb.device_model.v1');
+      _deviceName = _prefs!.getString('darb.device_name.v1');
+      _osVersion = _prefs!.getString('darb.device_os.v1');
+
+      // Fetch real hardware Android ID & device info from native platform channel
+      if (enableDeviceServices && defaultTargetPlatform == TargetPlatform.android) {
+        try {
+          const channel = MethodChannel('app.darb.darb/device');
+          final info = await channel
+              .invokeMethod<Map<dynamic, dynamic>>('getDeviceInfo')
+              .timeout(const Duration(milliseconds: 500), onTimeout: () => null);
+
+          if (info != null) {
+            final rawId = info['androidId']?.toString();
+            final model = info['deviceModel']?.toString();
+            final name = info['deviceName']?.toString();
+            final os = info['osVersion']?.toString();
+
+            if (model != null && model.trim().isNotEmpty) {
+              _deviceModel = model.trim();
+              await _prefs!.setString('darb.device_model.v1', _deviceModel!);
+            }
+            if (name != null && name.trim().isNotEmpty) {
+              _deviceName = name.trim();
+              await _prefs!.setString('darb.device_name.v1', _deviceName!);
+            }
+            if (os != null && os.trim().isNotEmpty) {
+              _osVersion = os.trim();
+              await _prefs!.setString('darb.device_os.v1', _osVersion!);
+            }
+
+            if ((savedId == null || savedId.isEmpty) && rawId != null && rawId.trim().isNotEmpty) {
               final hex = rawId.replaceAll(RegExp(r'[^0-9a-fA-F]'), '').toUpperCase();
               if (hex.length >= 12) {
                 final chunks = <String>[];
@@ -130,21 +159,21 @@ class AppController extends ChangeNotifier {
                 savedId = 'MAC-${hex.padRight(12, '0').substring(0, 12)}';
               }
             }
-          } catch (_) {}
-        }
-
-        // Fallback to stable generated MAC only if hardware platform ID is unavailable
-        if (savedId == null || savedId.isEmpty) {
-          final rand = Random();
-          final macLike = List.generate(
-            6,
-            (_) => rand.nextInt(256).toRadixString(16).padLeft(2, '0'),
-          ).join(':').toUpperCase();
-          savedId = 'MAC-$macLike';
-        }
-
-        await _prefs!.setString('darb.device_user_id.v1', savedId);
+          }
+        } catch (_) {}
       }
+
+      // Fallback to stable generated MAC only if hardware platform ID is unavailable
+      if (savedId == null || savedId.isEmpty) {
+        final rand = Random();
+        final macLike = List.generate(
+          6,
+          (_) => rand.nextInt(256).toRadixString(16).padLeft(2, '0'),
+        ).join(':').toUpperCase();
+        savedId = 'MAC-$macLike';
+      }
+
+      await _prefs!.setString('darb.device_user_id.v1', savedId);
       _sessionId = savedId;
       final raw = _prefs!.getString('darb.preferences.v1');
       if (raw != null) {
@@ -541,6 +570,9 @@ class AppController extends ChangeNotifier {
         speedKmh: speedKph,
         heading: heading,
         sessionId: _sessionId,
+        deviceModel: _deviceModel,
+        deviceName: _deviceName,
+        osVersion: _osVersion,
       ));
     }
 
@@ -785,15 +817,29 @@ class AppController extends ChangeNotifier {
     );
 
     if (sharing && !demoMode) {
-      unawaited(_api.reportIncident(report, userId: _sessionId).then((_) {
-        unawaited(fetchServerIncidents());
-      }));
+      unawaited(_api
+          .reportIncident(
+            report,
+            userId: _sessionId,
+            deviceModel: _deviceModel,
+            deviceName: _deviceName,
+          )
+          .then((_) {
+            unawaited(fetchServerIncidents());
+          }));
       try { await _community.submit(report); } catch (_) {}
     } else {
       if (!demoMode) {
-        unawaited(_api.reportIncident(report, userId: _sessionId).then((_) {
-          unawaited(fetchServerIncidents());
-        }));
+        unawaited(_api
+            .reportIncident(
+              report,
+              userId: _sessionId,
+              deviceModel: _deviceModel,
+              deviceName: _deviceName,
+            )
+            .then((_) {
+              unawaited(fetchServerIncidents());
+            }));
       }
     }
     localReports.insert(0, report);

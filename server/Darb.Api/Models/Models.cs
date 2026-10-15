@@ -33,6 +33,15 @@ public class GpsObservationDto
 
     [JsonPropertyName("sessionId")]
     public string? SessionId { get; set; }
+
+    [JsonPropertyName("deviceModel")]
+    public string? DeviceModel { get; set; }
+
+    [JsonPropertyName("deviceName")]
+    public string? DeviceName { get; set; }
+
+    [JsonPropertyName("osVersion")]
+    public string? OsVersion { get; set; }
 }
 
 public class TrafficIncident
@@ -85,6 +94,12 @@ public class TrafficIncidentDto
 
     [JsonPropertyName("userId")]
     public string? UserId { get; set; }
+
+    [JsonPropertyName("deviceModel")]
+    public string? DeviceModel { get; set; }
+
+    [JsonPropertyName("deviceName")]
+    public string? DeviceName { get; set; }
 }
 
 public class IncidentConfirmation
@@ -104,6 +119,9 @@ public class ConfirmIncidentRequest
 public class DarbUser
 {
     public string UserId { get; set; } = string.Empty; // Persistent MAC or hardware ID e.g. MAC-XX:XX:XX:XX:XX:XX
+    public string? DeviceModel { get; set; }
+    public string? DeviceName { get; set; }
+    public string? OsVersion { get; set; }
     public DateTime FirstSeenAt { get; set; } = DateTime.UtcNow;
     public DateTime LastSeenAt { get; set; } = DateTime.UtcNow;
     public int ReportCount { get; set; } = 0;
@@ -118,6 +136,15 @@ public class DarbUserDto
 {
     [JsonPropertyName("userId")]
     public string UserId { get; set; } = string.Empty;
+
+    [JsonPropertyName("deviceModel")]
+    public string? DeviceModel { get; set; }
+
+    [JsonPropertyName("deviceName")]
+    public string? DeviceName { get; set; }
+
+    [JsonPropertyName("osVersion")]
+    public string? OsVersion { get; set; }
 
     [JsonPropertyName("firstSeenAt")]
     public DateTime FirstSeenAt { get; set; }

@@ -903,6 +903,12 @@
       }
     }
 
+    function centerOnUser(lat, lon) {
+      if (map && lat && lon) {
+        map.flyTo([lat, lon], 16, { animate: true, duration: 1.2 });
+      }
+    }
+
     function renderUsersList(users) {
       const container = document.getElementById('users-container');
       if (!container) return;
@@ -926,17 +932,26 @@
         const isBlocked = u.status === 'blocked';
         const isTrusted = u.status === 'trusted';
         const lastSeen = u.lastSeenSecondsAgo < 60 ? (isArabic ? 'الآن' : 'Now') : `${Math.round(u.lastSeenSecondsAgo/60)} ${isArabic ? 'دقيقة' : 'min'}`;
+        const deviceTitle = u.deviceName || u.deviceModel || (isArabic ? 'هاتف محمول' : 'Mobile Device');
+        const modelSubtitle = u.deviceModel && u.deviceModel !== u.deviceName ? ` • ${u.deviceModel}` : '';
+        const osInfo = u.osVersion ? ` • ${u.osVersion}` : '';
 
         return `
-          <div class="user-card">
+          <div class="user-card" id="user-card-${u.userId}">
             <div class="user-header">
-              <span class="user-mac">${u.userId}</span>
+              <div>
+                <div style="font-weight: 800; font-size: 13px; color: #FFF; display: flex; align-items: center; gap: 6px;">
+                  <span>📱</span> <span>${deviceTitle}</span>
+                </div>
+                <div class="user-mac" style="margin-top: 2px;">${u.userId}${modelSubtitle}${osInfo}</div>
+              </div>
               <span class="badge ${badgeClass}">${badgeText}</span>
             </div>
-            <div style="color:var(--text-muted); font-size:11px;">
+            <div style="color:var(--text-muted); font-size:11px; margin-top: 2px;">
               <span>📝 ${isArabic ? 'البلاغات:' : 'Reports:'} <b>${u.reportCount}</b></span> • 
               <span>👍 ${isArabic ? 'التأكيدات:' : 'Confirms:'} <b>${u.confirmationCount}</b></span> • 
               <span>⏱️ ${isArabic ? 'آخر ظهور:' : 'Last Seen:'} <b>${lastSeen}</b></span>
+              ${u.lastSpeedKmh != null && u.lastSpeedKmh > 0 ? ` • <span>⚡ <b>${Math.round(u.lastSpeedKmh)} كم/س</b></span>` : ''}
             </div>
             <div class="action-group">
               <button class="btn-sm ${isBlocked ? 'btn-sm-warning' : 'btn-sm-danger'}" onclick="adminToggleBlock('${u.userId}')">
@@ -945,6 +960,11 @@
               <button class="btn-sm btn-sm-trust" onclick="adminToggleTrust('${u.userId}')">
                 <span>${isTrusted ? '⭐' : '🌟'}</span> ${isTrusted ? (isArabic ? 'إلغاء التوثيق' : 'Untrust') : (isArabic ? 'ترقية لموثوق' : 'Trust User')}
               </button>
+              ${u.lastLatitude && u.lastLongitude ? `
+                <button class="btn-sm" style="border-color: var(--primary); color: var(--primary);" onclick="centerOnUser(${u.lastLatitude}, ${u.lastLongitude})">
+                  <span>📍</span> ${isArabic ? 'تحديد' : 'Locate'}
+                </button>
+              ` : ''}
             </div>
           </div>
         `;
@@ -1185,32 +1205,63 @@
       if (vehicles && vehicles.length > 0) {
         vehicles.forEach(v => {
           const uId = v.userId || 'مستخدم درب';
+          const devName = v.deviceName || v.deviceModel || (isArabic ? 'هاتف محمول' : 'Mobile Device');
+          const devModel = v.deviceModel || '';
+          const os = v.osVersion || '';
           const headingDeg = v.heading || 0;
           const speed = Math.round(v.speedKmh || 0);
-          const age = v.lastSeenSecondsAgo != null ? `${v.lastSeenSecondsAgo} ثانية` : 'الآن';
+          const age = v.lastSeenSecondsAgo != null ? (v.lastSeenSecondsAgo < 60 ? (isArabic ? 'الآن' : 'Now') : `${Math.round(v.lastSeenSecondsAgo/60)} ${isArabic ? 'د' : 'm'}`) : 'الآن';
+          const isBlocked = v.status === 'blocked';
+          const isTrusted = v.status === 'trusted';
+          
+          let statusBadge = `<span style="background: rgba(0,230,118,0.2); color:#00E676; padding: 2px 6px; border-radius: 8px; font-size: 10px; font-weight: 800;">${isArabic ? 'نشط' : 'Active'}</span>`;
+          if (isBlocked) {
+            statusBadge = `<span style="background: rgba(255,61,0,0.2); color:#FF3D00; padding: 2px 6px; border-radius: 8px; font-size: 10px; font-weight: 800;">${isArabic ? 'محظور' : 'Blocked'}</span>`;
+          } else if (isTrusted) {
+            statusBadge = `<span style="background: rgba(0,210,255,0.2); color:#00D2FF; padding: 2px 6px; border-radius: 8px; font-size: 10px; font-weight: 800;">⭐ ${isArabic ? 'موثوق' : 'Trusted'}</span>`;
+          }
 
           // Direction-oriented vehicle puck
           const vehicleIcon = L.divIcon({
             html: `
-              <div style="position: relative; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center;">
-                <div style="position: absolute; width: 28px; height: 28px; border-radius: 50%; background: rgba(0, 210, 255, 0.25);"></div>
-                <div style="width: 22px; height: 22px; border-radius: 50%; background: #00D2FF; border: 2.5px solid #FFFFFF; box-shadow: 0 0 8px rgba(0,210,255,0.9); display: flex; align-items: center; justify-content: center; transform: rotate(${headingDeg}deg);">
-                  <div style="width: 0; height: 0; border-left: 4px solid transparent; border-right: 4px solid transparent; border-bottom: 8px solid #0A0E14; margin-bottom: 2px;"></div>
+              <div style="position: relative; width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; cursor: pointer;">
+                <div style="position: absolute; width: 32px; height: 32px; border-radius: 50%; background: ${isBlocked ? 'rgba(255,61,0,0.25)' : 'rgba(0, 210, 255, 0.25)'};"></div>
+                <div style="width: 24px; height: 24px; border-radius: 50%; background: ${isBlocked ? '#FF3D00' : '#00D2FF'}; border: 2.5px solid #FFFFFF; box-shadow: 0 0 10px ${isBlocked ? 'rgba(255,61,0,0.9)' : 'rgba(0,210,255,0.9)'}; display: flex; align-items: center; justify-content: center; transform: rotate(${headingDeg}deg);">
+                  <div style="width: 0; height: 0; border-left: 4.5px solid transparent; border-right: 4.5px solid transparent; border-bottom: 9px solid #0A0E14; margin-bottom: 2px;"></div>
                 </div>
               </div>
             `,
             className: 'custom-vehicle-puck',
-            iconSize: [30, 30],
-            iconAnchor: [15, 15]
+            iconSize: [34, 34],
+            iconAnchor: [17, 17]
           });
 
           L.marker([v.latitude, v.longitude], { icon: vehicleIcon })
             .bindPopup(`
-              <div style="font-family: inherit; direction: ${isArabic ? 'rtl' : 'ltr'}; padding: 4px;">
-                <b style="color: #00D2FF; font-size: 13px;">🚗 مركبة متصلة (${uId})</b><br/>
-                <b>السرعة:</b> ${speed} كم/س<br/>
-                <b>الاتجاه:</b> ${headingDeg}°<br/>
-                <small style="color: #888;">آخر إشارة: منذ ${age}</small>
+              <div style="font-family: inherit; direction: ${isArabic ? 'rtl' : 'ltr'}; padding: 6px; min-width: 230px;">
+                <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 6px; margin-bottom: 6px;">
+                  <b style="color: #FFF; font-size: 13px; display:flex; align-items:center; gap:5px;">📱 ${devName}</b>
+                  ${statusBadge}
+                </div>
+                <div style="font-size: 11px; color: var(--primary); font-family: var(--mono); font-weight:700; margin-bottom: 4px;">
+                  🆔 ${uId}
+                </div>
+                ${devModel && devModel !== devName ? `<div style="font-size: 10px; color: #8A99AD; margin-bottom: 3px;"><b>الطراز:</b> ${devModel}</div>` : ''}
+                ${os ? `<div style="font-size: 10px; color: #8A99AD; margin-bottom: 4px;"><b>النظام:</b> ${os}</div>` : ''}
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px; font-size: 11px; background: rgba(255,255,255,0.03); padding: 6px; border-radius: 6px; margin: 6px 0;">
+                  <div>⚡ <b>${speed}</b> كم/س</div>
+                  <div>🧭 <b>${headingDeg}°</b> اتجاه</div>
+                  <div>⏱️ منذ <b>${age}</b></div>
+                  <div>📝 <b>${v.reportCount || 0}</b> بلاغات</div>
+                </div>
+                <div style="display: flex; gap: 6px; margin-top: 8px;">
+                  <button onclick="adminToggleBlock('${uId}')" style="flex:1; background:${isBlocked ? '#FFA000' : '#FF3D00'}; color:${isBlocked ? '#000' : '#FFF'}; border:none; padding:4px 8px; border-radius:6px; font-size:10px; font-weight:800; cursor:pointer;">
+                    ${isBlocked ? '🔓 فك الحظر' : '🚫 حظر'}
+                  </button>
+                  <button onclick="adminToggleTrust('${uId}')" style="flex:1; background:rgba(0,210,255,0.2); color:#00D2FF; border:1px solid #00D2FF; padding:4px 8px; border-radius:6px; font-size:10px; font-weight:800; cursor:pointer;">
+                    ${isTrusted ? '⭐ إلغاء التوثيق' : '🌟 توثيق'}
+                  </button>
+                </div>
               </div>
             `)
             .addTo(markersLayer);
