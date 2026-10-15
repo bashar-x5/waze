@@ -209,12 +209,27 @@ public class TrafficIntelligenceService : ITrafficIntelligenceService
 
         foreach (var cluster in clusters)
         {
-            var cellKey = $"cell_{cluster.Key.LatCell}_{cluster.Key.LonCell}";
-            var count = cluster.Count();
-            var speeds = cluster.Select(c => c.SpeedKmh).OrderBy(s => s).ToList();
+            // Distinct active users/vehicles in this cluster to prevent 1 mobile from creating false congestion
+            var distinctVehicles = cluster
+                .Select(c => string.IsNullOrEmpty(c.SessionId) ? $"legacy_{c.Id}" : c.SessionId)
+                .Distinct()
+                .Count();
 
-            // Calculate robust trimmed average speed
-            var avgSpeed = speeds.Skip(speeds.Count / 5).Take(Math.Max(1, speeds.Count - 2 * (speeds.Count / 5))).Average();
+            // Require at least 2 distinct vehicles to aggregate an automated cell
+            if (distinctVehicles < 2) continue;
+
+            var cellKey = $"cell_{cluster.Key.LatCell}_{cluster.Key.LonCell}";
+            var count = distinctVehicles;
+            var speeds = cluster
+                .GroupBy(c => string.IsNullOrEmpty(c.SessionId) ? $"legacy_{c.Id}" : c.SessionId)
+                .Select(g => g.OrderByDescending(c => c.ObservedAt).First().SpeedKmh)
+                .OrderBy(s => s)
+                .ToList();
+
+            // Calculate robust trimmed average speed across unique vehicles
+            var avgSpeed = speeds.Count > 2
+                ? speeds.Skip(speeds.Count / 5).Take(Math.Max(1, speeds.Count - 2 * (speeds.Count / 5))).Average()
+                : speeds.Average();
             const double normalSpeed = 50.0;
 
             var congestionLevel = "free";

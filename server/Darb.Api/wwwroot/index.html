@@ -749,18 +749,40 @@
         });
       }
 
-      // Render recent vehicle fixes
-      if (data.recentObservations) {
-        data.recentObservations.forEach(obs => {
-          const circle = L.circleMarker([obs.latitude, obs.longitude], {
-            radius: 6,
-            fillColor: '#00D2FF',
-            color: '#FFFFFF',
-            weight: 1.5,
-            opacity: 1,
-            fillOpacity: 0.8
-          }).bindPopup(`<b>مركبة نشطة</b><br>السرعة: ${obs.speedKmh} كم/س<br>الاتجاه: ${obs.heading}°`);
-          markersLayer.addLayer(circle);
+      // Render active vehicles (1 unique marker per mobile device, no duplicates)
+      const vehicles = data.activeVehiclesList || data.recentObservations;
+      if (vehicles && vehicles.length > 0) {
+        vehicles.forEach(v => {
+          const uId = v.userId || 'مستخدم درب';
+          const headingDeg = v.heading || 0;
+          const speed = Math.round(v.speedKmh || 0);
+          const age = v.lastSeenSecondsAgo != null ? `${v.lastSeenSecondsAgo} ثانية` : 'الآن';
+
+          // Direction-oriented vehicle puck
+          const vehicleIcon = L.divIcon({
+            html: `
+              <div style="position: relative; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center;">
+                <div style="position: absolute; width: 28px; height: 28px; border-radius: 50%; background: rgba(0, 210, 255, 0.25);"></div>
+                <div style="width: 22px; height: 22px; border-radius: 50%; background: #00D2FF; border: 2.5px solid #FFFFFF; box-shadow: 0 0 8px rgba(0,210,255,0.9); display: flex; align-items: center; justify-content: center; transform: rotate(${headingDeg}deg);">
+                  <div style="width: 0; height: 0; border-left: 4px solid transparent; border-right: 4px solid transparent; border-bottom: 8px solid #0A0E14; margin-bottom: 2px;"></div>
+                </div>
+              </div>
+            `,
+            className: 'custom-vehicle-puck',
+            iconSize: [30, 30],
+            iconAnchor: [15, 15]
+          });
+
+          L.marker([v.latitude, v.longitude], { icon: vehicleIcon })
+            .bindPopup(`
+              <div style="font-family: inherit; direction: ${isArabic ? 'rtl' : 'ltr'}; padding: 4px;">
+                <b style="color: #00D2FF; font-size: 13px;">🚗 مركبة متصلة (${uId})</b><br/>
+                <b>السرعة:</b> ${speed} كم/س<br/>
+                <b>الاتجاه:</b> ${headingDeg}°<br/>
+                <small style="color: #888;">آخر إشارة: منذ ${age}</small>
+              </div>
+            `)
+            .addTo(markersLayer);
         });
       }
     }

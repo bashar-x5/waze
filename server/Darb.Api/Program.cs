@@ -322,17 +322,29 @@ app.MapGet("/api/dashboard/stats", async (
     var recentObservations = await db.GpsObservations
         .Where(o => o.ReceivedAt >= tenMinsAgo)
         .OrderByDescending(o => o.ReceivedAt)
-        .Take(50)
+        .Take(100)
         .ToListAsync(ct);
 
-    var activeVehicles = recentObservations
-        .Select(o => o.SessionId)
-        .Where(s => !string.IsNullOrEmpty(s))
-        .Distinct()
-        .Count();
+    // Group by SessionId to return exactly ONE latest position per active vehicle (No duplicate measurements!)
+    var latestVehicleFixes = recentObservations
+        .Where(o => !string.IsNullOrEmpty(o.SessionId))
+        .GroupBy(o => o.SessionId)
+        .Select(g => g.First())
+        .Select(o => new {
+            userId = o.SessionId,
+            latitude = o.Latitude,
+            longitude = o.Longitude,
+            speedKmh = Math.Round(o.SpeedKmh, 1),
+            heading = Math.Round(o.Heading ?? 0.0, 0),
+            observedAt = o.ObservedAt,
+            lastSeenSecondsAgo = Math.Max(0, (int)(now - o.ReceivedAt).TotalSeconds)
+        })
+        .ToList();
 
-    var avgSpeed = recentObservations.Count > 0
-        ? Math.Round(recentObservations.Average(o => o.SpeedKmh), 1)
+    var activeVehicles = latestVehicleFixes.Count;
+
+    var avgSpeed = latestVehicleFixes.Count > 0
+        ? Math.Round(latestVehicleFixes.Average(o => o.speedKmh), 1)
         : 0.0;
 
     // Active incidents
@@ -390,13 +402,8 @@ app.MapGet("/api/dashboard/stats", async (
         },
         recentIncidents = activeIncidents,
         congestionSegments,
-        recentObservations = recentObservations.Take(30).Select(o => new {
-            o.Latitude,
-            o.Longitude,
-            o.SpeedKmh,
-            o.Heading,
-            o.ObservedAt
-        })
+        recentObservations = latestVehicleFixes,
+        activeVehiclesList = latestVehicleFixes
     });
 })
 .WithName("GetDashboardStats");

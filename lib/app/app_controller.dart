@@ -29,7 +29,10 @@ class AppController extends ChangeNotifier {
   final RoutingService _routing;
   final PlaceSearchService _search;
   final DarbApiService _api;
-  final String _sessionId = 'darb_${DateTime.now().millisecondsSinceEpoch}_${Random().nextInt(99999)}';
+  String _sessionId = 'usr_${Random().nextInt(0xFFFFFF).toRadixString(16).padLeft(6, '0').toUpperCase()}';
+  final Set<String> _spokenManeuverSignatures = {};
+  String? _lastSpokenPhrase;
+  DateTime? _lastSpokenTimestamp;
   DateTime? _lastGpsObservationSent;
   SharedPreferences? _prefs;
   FlutterTts? _tts;
@@ -101,6 +104,18 @@ class AppController extends ChangeNotifier {
   Future<void> load() async {
     try {
       _prefs = await SharedPreferences.getInstance();
+      final savedId = _prefs!.getString('darb.device_user_id.v1');
+      if (savedId != null && savedId.isNotEmpty) {
+        _sessionId = savedId;
+      } else {
+        final rand = Random();
+        final macLike = List.generate(
+          6,
+          (_) => rand.nextInt(256).toRadixString(16).padLeft(2, '0'),
+        ).join(':').toUpperCase();
+        _sessionId = 'usr_$macLike';
+        unawaited(_prefs!.setString('darb.device_user_id.v1', _sessionId));
+      }
       final raw = _prefs!.getString('darb.preferences.v1');
       if (raw != null) {
         final p = jsonDecode(raw) as Map<String, dynamic>;
@@ -170,7 +185,7 @@ class AppController extends ChangeNotifier {
     return _saveQueue;
   }
 
-  void setLanguage(bool value) { arabic = value; _spokenStep = -1; _save(); _emit(); }
+  void setLanguage(bool value) { arabic = value; _spokenStep = -1; _spokenManeuverSignatures.clear(); _lastSpokenPhrase = null; _save(); _emit(); }
   void setDark(bool value) { dark = value; _save(); _emit(); }
   void setMiles(bool value) { miles = value; _save(); _emit(); }
   void setVoice(bool value) { voice = value; if (!value) _tts?.stop(); _save(); _emit(); }
@@ -426,6 +441,9 @@ class AppController extends ChangeNotifier {
       if (route == null || error != null || _disposed) return;
     }
     navigating = true; arrived = false; showParkingPrompt = false; _spokenStep = -1; _offRouteSamples = 0;
+    _spokenManeuverSignatures.clear();
+    _lastSpokenPhrase = null;
+    _lastSpokenTimestamp = null;
     progress = null;
     notice = null; // Clean screen for navigation HUD and map view
     if (demoMode) {
@@ -538,23 +556,31 @@ class AppController extends ChangeNotifier {
         'الحمد لله على سلامتك! لقد وصلت إلى وجهتك بنجاح.',
       );
     } else {
-      if (current.steps.isNotEmpty && p.stepIndex != _spokenStep) {
-        _spokenStep = p.stepIndex;
+      if (current.steps.isNotEmpty) {
         final step = current.steps[p.stepIndex.clamp(0, current.steps.length - 1)];
-        if (!lessChatty || !step.type.contains('continue')) _speak(step.label(arabic));
+        final maneuverKey = '${step.type}_${step.instruction}_'
+            '${step.point.latitude.toStringAsFixed(4)}_${step.point.longitude.toStringAsFixed(4)}';
+
+        if (!_spokenManeuverSignatures.contains(maneuverKey)) {
+          _spokenManeuverSignatures.add(maneuverKey);
+          _spokenStep = p.stepIndex;
+          if (!lessChatty || !step.type.contains('continue')) {
+            _speak(step.label(arabic));
+          }
+        }
       }
 
-      // Instant auto-reroute when taking a wrong turn:
-      // If heading is divergent (>50°) and vehicle moved 15m away, or if general distance > 30m
-      final isOffRoute = (isHeadingDivergent && p.distanceFromRouteMeters > 15) ||
-          p.distanceFromRouteMeters > 30;
+      // Auto-reroute when taking a wrong turn:
+      // Require confirmed heading divergence with distance > 25m or major off-route > 50m
+      final isOffRoute = (isHeadingDivergent && p.distanceFromRouteMeters > 25) ||
+          p.distanceFromRouteMeters > 50;
 
       if (isOffRoute) {
         _offRouteSamples++;
         final now = DateTime.now();
         final canReroute = !busy &&
-            (_lastReroute == null || now.difference(_lastReroute!).inSeconds >= 3);
-        if ((_offRouteSamples >= 1 || p.distanceFromRouteMeters > 45) && canReroute) {
+            (_lastReroute == null || now.difference(_lastReroute!).inSeconds >= 5);
+        if ((_offRouteSamples >= 2 || p.distanceFromRouteMeters > 60) && canReroute) {
           _lastReroute = now;
           _offRouteSamples = 0;
           _speak(tr('Rerouting in your direction...', 'جارٍ إعادة التوجيه في اتجاهك...'));
@@ -574,8 +600,19 @@ class AppController extends ChangeNotifier {
     _emit();
   }
 
-  Future<void> _speak(String text) async {
-    if (!voice || !enableDeviceServices) return;
+  Future<void> _speak(String text, {bool force = false}) async {
+    if (!voice || !enableDeviceServices || text.trim().isEmpty) return;
+    final now = DateTime.now();
+    // Do not repeat identical phrase within 25 seconds unless forced
+    if (!force && _lastSpokenPhrase == text) {
+      if (_lastSpokenTimestamp != null &&
+          now.difference(_lastSpokenTimestamp!).inSeconds < 25) {
+        return;
+      }
+    }
+    _lastSpokenPhrase = text;
+    _lastSpokenTimestamp = now;
+
     try {
       _tts ??= FlutterTts();
       await _tts!.setLanguage(arabic ? 'ar' : 'en-US');
@@ -589,6 +626,11 @@ class AppController extends ChangeNotifier {
 
   void stopNavigation() {
     _simulation?.cancel(); _simulation = null; _tts?.stop();
+    _spokenManeuverSignatures.clear();
+    _lastSpokenPhrase = null;
+    _lastSpokenTimestamp = null;
+    _spokenStep = -1;
+    _offRouteSamples = 0;
     navigating = false; speedKph = 0; _emit();
   }
 
