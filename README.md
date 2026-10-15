@@ -1,72 +1,58 @@
-# Darb (درب) — 100% Free & Open-Source Waze Navigation Clone
+﻿# Darb (درب) — Iraq-First Open-Source Community Navigation (Waze Alternative)
 
-A full-featured, community-driven GPS navigation app built with Flutter, designed to deliver the iconic **Waze** experience with **100% free, open-source infrastructure** and **zero paid API fees**.
+A full-featured, community-driven GPS navigation ecosystem built with Flutter, MapLibre GL 3D vector maps, and an ASP.NET Core 9 / PostGIS backend, delivering the iconic **Waze** experience with **100% free, open-source infrastructure** and **zero user-side API fees**.
 
 ---
 
-## 🌟 100% Free & Open-Source Stack (Zero Paid Keys)
+## 📲 Download & Live Links
 
-Unlike commercial navigation apps that rely on expensive Google Maps or Mapbox APIs, Darb is completely free to build, host, and run:
+- 📱 **Download Android APK**: [http://139.185.47.123:5000/darb.apk](http://139.185.47.123:5000/darb.apk)
+- 🌐 **Live Web Traffic Dashboard**: [http://139.185.47.123:5000/](http://139.185.47.123:5000/)
+- 📖 **Complete Features Guide**: [FEATURES.md](FEATURES.md)
 
-| Component | Free Solution | Details |
+---
+
+## 🌟 Modern Open-Source Architecture
+
+| Component | Solution | Details |
 |---|---|---|
-| **Map Rendering** | [OpenStreetMap](https://www.openstreetmap.org/) & [CartoDB Basemaps](https://carto.com/basemaps/) | Free vector-styled raster tiles with daytime and dark mode styles via `flutter_map`. |
-| **Turn-by-Turn Routing** | [OSRM](http://project-osrm.org/) (Open Source Routing Machine) | Free routing with alternate routes, turn maneuvers, and realistic ETA calculation. |
-| **Geocoding & Search** | [Photon](https://photon.komoot.io/) (Komoot) | Fast, open-source geocoding with location-biased search and categorized points of interest. |
-| **Voice Navigation** | [Flutter TTS](https://pub.dev/packages/flutter_tts) | Device-native, on-device Text-to-Speech engine in Arabic and English (no cloud fees). |
-| **Community Alerts** | [Supabase Free Tier](https://supabase.com/) & Local DB | Real-time crowdsourced road reports, confirmations, and alerts with offline-first support. |
-| **GPS & Sensors** | Device Hardware (`geolocator`) | High-accuracy GPS positioning with smooth bearing heading orientation. |
+| **Map Rendering** | [MapLibre GL](https://maplibre.org/) & [OpenFreeMap](https://openfreemap.org/) | Full-bleed native OpenGL 3D vector tiles with 60° tilt and dynamic 3D building extrusions. |
+| **Turn-by-Turn Routing** | [OSRM](http://project-osrm.org/) & Darb Backend | Compass bearing-aware routing, instant rerouting on wrong turns without U-turns, and multiple alternative routes. |
+| **Live Traffic Engine** | Server-Side TomTom Harvester + PostGIS | Periodic corridor harvesting (every 5 min) cached in PostGIS, avoiding client API costs while delivering live congestion. |
+| **Parking Intelligence** | Smart Parking & Find My Car | Auto-prompt on arrival, 1-tap manual parking saving, live distance/elapsed time, and walking/driving route back. |
+| **Geocoding & Search** | [Photon](https://photon.komoot.io/) (Komoot) | Fast geocoding with Iraq bounding box, location-biased search, and offline landmark fallbacks. |
+| **Voice Navigation** | [Flutter TTS](https://pub.dev/packages/flutter_tts) | Device-native, on-device Arabic and English Text-to-Speech engine without cloud latency or fees. |
+| **Community Alerts** | Darb API + PostGIS / Supabase | Real-time crowdsourced road reports (Police, Crash, Traffic, Hazard) with Still there? verification. |
+| **In-Car Platform** | [Android Auto](https://developer.android.com/training/cars/apps) | Native Android Auto CarAppService and NavigationScreen for dashboard infotainment. |
 
 ---
 
-## 🚗 Iconic Waze Features Included
+## 🚗 Key Capabilities
 
-1. **Waze Navigation Map**:
-   - High-contrast day and night map styles.
-   - Vibrant neon cyan active route line with dark navy casing and glow.
-   - Alternate route comparisons (Fastest vs. Alternative).
-   - Animated user vehicle puck that rotates with device heading.
-   - Long-press anywhere on the map to drop a pin and navigate instantly.
+1. **🅿️ Smart Parking Slot & Find My Car**:
+   - Automatic arrival prompt: *وصلت إلى وجهتك! هل ترغب في حفظ موقع ركن السيارة؟*
+   - 1-tap quick button (ركنت هنا) anytime.
+   - Dedicated dashboard card showing live distance (على بُعد 85 م) and time elapsed (منذ 15 د).
+   - 1-tap Go (انطلق) navigation directly back to your vehicle.
 
-2. **Top Maneuver HUD**:
-   - Large maneuver icons (Turn Left, Turn Right, Roundabout, Merge, U-Turn, Arrive).
-   - Remaining distance to maneuver (`300 m`, `1.5 km`).
-   - Street names and maneuver instructions in English and Arabic (`شارع الرشيد`).
-   - "Next step" preview (`Then: Turn right`).
-   - Tap HUD to inspect the full **Turn-by-Turn Directions list**.
+2. **🧭 Instant Heading-Aware Rerouting**:
+   - Detects divergence when turning onto an unexpected road (headingDivergence > 65°).
+   - Immediately requests new paths with earings parameter, guiding drivers forward instead of insisting on dangerous U-turns.
 
-3. **Floating Speedometer**:
-   - Circular Waze-style speedometer badge displaying real-time vehicle speed in `km/h` or `mph`.
-   - Speed warning highlight.
+3. **🚦 Real-Time Traffic Bottleneck Warnings**:
+   - Multi-tier color coding: Free (Cyan/Blue), Moderate (Amber), Heavy (Red), Standstill (Burgundy).
+   - Waze-style floating bottleneck pills alerting of upcoming slowdowns ahead of time.
 
-4. **Crowdsourced Road Reporting (Iconic Orange Button)**:
-   - Dedicated orange Waze floating action button (FAB).
-   - 8 Community Report categories:
-     - 👮 **Police** (`شرطة`)
-     - 🚗 **Traffic Jam** (`ازدحام`)
-     - ⚠️ **Hazard** (`خطر`)
-     - 💥 **Crash** (`حادث سير`)
-     - 📷 **Speed Camera** (`رادار سرعة`)
-     - ⛔ **Road Closure** (`طريق مغلق`)
-     - 🚧 **Construction** (`أعمال صيانة`)
-     - 🌧️ **Bad Weather** (`طقس سيء`)
-   - Interactive report pins on the map with confirmation badges.
-   - **"Still there?"** interactive popup where nearby drivers can confirm (`👍 Still there`) or report absent (`✕ Not there`).
+4. **📢 8-Category Crowdsourced Reports**:
+   - Police / Checkpoints (شرطة), Traffic (ازدحام), Hazards (خطر), Crashes (حادث سير), Speed Cameras (رادار), Road Closures (طريق مغلق), Maintenance (صيانة), Weather (أمطار).
+   - Interactive popups for nearby drivers to confirm or report cleared.
 
-5. **Waze Bottom Control Sheet**:
-   - **Idle Mode**: "Where to?" search trigger, one-tap Home and Work buttons, Saved Places, and recent destination chips.
-   - **Route Preview**: Detailed destination card, multiple route choices, "+ Add Stop" waypoint support, and "Drive Now" button.
-   - **Active Driving Mode**: Live ETA clock, remaining duration, remaining distance, and prominent red "End Navigation" button.
+5. **🗺️ 3D Perspective & Dark Mode**:
+   - Native 3D perspective driving mode with building extrusions.
+   - Automatic and manual Day/Night theme switching.
 
-6. **Search & Discovery**:
-   - Quick Category pills: ⛽ Gas Stations, 🍔 Food, 🅿️ Parking, ⚡ EV Charging, 🏛️ Landmarks.
-   - Live location-biased geocoding.
-   - Star places as Favorites.
-
-7. **Bilingual & Accessibility**:
-   - Full English and Arabic (`العربية`) UI with right-to-left (RTL) support.
-   - Voice alerts with "Less Chatty" mode for essential directions only.
-   - Built-in Baghdad demo simulation mode to test trips without requiring real physical driving.
+6. **🇮🇶 100% Bilingual**:
+   - Complete Arabic (العربية) and English UI, RTL formatting, and native voice guidance.
 
 ---
 
@@ -74,53 +60,60 @@ Unlike commercial navigation apps that rely on expensive Google Maps or Mapbox A
 
 ### Prerequisites
 - Flutter SDK 3.24+ (Dart 3.5+)
-- Android Studio / Xcode / Windows build tools
+- Android Studio / VS Code
+- Android device or emulator (Android 8.0+)
 
-### Installation
-```bash
+### Quick Start
+`ash
 # Clone the repository
+git clone https://github.com/bashar-x5/waze.git
 cd waze
 
-# Fetch dependencies
+# Install dependencies
 flutter pub get
 
-# Run static analysis
-flutter analyze
-
-# Run unit and widget tests
+# Run test suite
 flutter test
 
-# Launch the app
+# Run app on connected device
 flutter run
-```
+`
 
 ---
 
-## 📁 Architecture Overview
+## 📁 Repository Structure
 
-```
-lib/
-├── main.dart                  # Application entry point
-├── app/
-│   ├── app_controller.dart    # Main reactive state controller (GPS, routes, TTS, reports)
-│   └── darb_app.dart          # App theme, localization, root ListenableBuilder
-├── domain/
-│   ├── demo_data.dart         # Baghdad demo simulation data & sample landmarks
-│   ├── models.dart            # Place, RoadReport, DriveRoute, RouteStep, PlannedDrive
-│   └── navigation_engine.dart # Turn progression, segment projection & ETA calculation
-├── services/
-│   ├── community_service.dart # Real-time Supabase community reports sync
-│   ├── place_search_service.dart # Photon / Komoot geocoding service
-│   └── routing_service.dart   # OSRM open-source routing engine client
-└── ui/
-    ├── home_screen.dart       # Main interactive map & navigation HUD container
-    ├── waze_theme.dart        # Waze color palette, maneuver icons, incident styling
-    └── widgets/
-        ├── waze_bottom_panel.dart    # Idle search / Route preview / Active drive bottom sheets
-        ├── waze_incident_popup.dart  # "Still there?" incident confirmation card
-        ├── waze_nav_hud.dart         # Top navigation maneuver banner & turn list
-        ├── waze_report_sheet.dart    # 8-grid road alert reporting modal
-        ├── waze_search_modal.dart    # Place search & POI categories sheet
-        ├── waze_settings_modal.dart  # Settings, audio, language, and demo toggles
-        └── waze_speedometer.dart     # Circular real-time speedometer
-```
+`
+├── assets/
+│   └── map_styles/              # OpenFreeMap vector styles & configs
+├── lib/
+│   ├── main.dart                # Application entry point
+│   ├── app/
+│   │   ├── app_controller.dart  # Reactive state controller (GPS, routes, parking, traffic)
+│   │   └── darb_app.dart        # App theme, localization, root ListenableBuilder
+│   ├── domain/
+│   │   ├── demo_data.dart       # Baghdad landmarks, demo routes & simulation points
+│   │   ├── models.dart          # Domain models: Place, DriveRoute, ParkedCarLocation, etc.
+│   │   ├── navigation_engine.dart # Turn-by-turn progression, heading divergence, snapping
+│   │   └── traffic_engine.dart  # Congestion segmentation, bottleneck detection, severity
+│   ├── services/
+│   │   ├── android_auto_service.dart # Android Auto CarApp integration
+│   │   ├── darb_api_service.dart     # Darb backend client (Traffic, corridors, observations)
+│   │   ├── place_search_service.dart # Photon geocoding client
+│   │   └── routing_service.dart      # OSRM bearing-constrained routing client
+│   └── ui/
+│       ├── home_screen.dart     # MapLibre 3D map, car puck, HUD, parking banners
+│       ├── waze_theme.dart      # Theme colors, badges, maneuver icons
+│       └── widgets/             # Panels, modals, speedometer, incident popups
+├── server/
+│   └── Darb.Api/                # ASP.NET Core 9 backend, TomTom harvester, Web dashboard
+├── test/                        # Comprehensive unit & widget test suite
+├── FEATURES.md                  # Complete technical features documentation
+└── README.md                    # Project overview & quick start
+`
+
+---
+
+## 📄 License
+
+Open-source under the MIT License.
