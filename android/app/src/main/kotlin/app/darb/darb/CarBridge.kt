@@ -295,4 +295,25 @@ object CarBridge : MethodChannel.MethodCallHandler {
             )
         }
     }
+
+    fun notifyReportIncident(type: String) {
+        mainHandler.post {
+            channel?.invokeMethod(
+                "onReportIncident",
+                mapOf("type" to type)
+            )
+        }
+    }
+
+    fun notifySaveParkingSpot() {
+        mainHandler.post {
+            channel?.invokeMethod("onSaveParkingSpot", null)
+        }
+    }
+
+    fun notifyClearParkingSpot() {
+        mainHandler.post {
+            channel?.invokeMethod("onClearParkingSpot", null)
+        }
+    }
 }

@@ -117,6 +117,25 @@ class AndroidAutoService {
           return {'action': 'not_found', 'query': targetQuery};
         }
 
+      case 'onReportIncident':
+        final rArgs = call.arguments as Map?;
+        final typeStr = (rArgs?['type'] as String? ?? 'hazard').toLowerCase();
+        final matchedType = ReportType.values.firstWhere(
+          (t) => t.name.toLowerCase() == typeStr,
+          orElse: () => ReportType.hazard,
+        );
+        final reportDesc = controller.arabic ? 'بلاغ مباشر من شاشة السيارة' : 'Live report from Car Screen';
+        await controller.addReport(matchedType, reportDesc);
+        break;
+
+      case 'onSaveParkingSpot':
+        controller.saveParkingLocation();
+        break;
+
+      case 'onClearParkingSpot':
+        controller.clearParkingLocation();
+        break;
+
       case 'onSearchQueryChanged':
         final args = call.arguments as Map?;
         final query = args?['query'] as String? ?? '';

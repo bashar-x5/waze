@@ -5,6 +5,7 @@ import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.Rect
+import android.graphics.RectF
 import android.view.Surface
 import androidx.car.app.AppManager
 import androidx.car.app.CarContext
@@ -51,6 +52,18 @@ class DarbCarScreen(carContext: CarContext) : Screen(carContext),
     private var surfaceHeight: Int = 720
     private var visibleArea: Rect? = null
     private val renderExecutor = Executors.newSingleThreadExecutor()
+
+    // Interactive Button Touch Hit-Testing Rectangles
+    private val reportBtnRect = RectF()
+    private val searchBarRect = RectF()
+    private val voiceBtnRect = RectF()
+    private val homeBtnRect = RectF()
+    private val workBtnRect = RectF()
+    private val savedBtnRect = RectF()
+    private val parkingBtnRect = RectF()
+    private val stopNavBtnRect = RectF()
+    private val satelliteBtnRect = RectF()
+    private var isSatelliteManual = false
 
     init {
         CarBridge.addStateListener(this)
@@ -115,7 +128,73 @@ class DarbCarScreen(carContext: CarContext) : Screen(carContext),
     override fun onScroll(distanceX: Float, distanceY: Float) {}
     override fun onFling(velocityX: Float, velocityY: Float) {}
     override fun onScale(focusX: Float, focusY: Float, scaleFactor: Float) {}
-    override fun onClick(x: Float, y: Float) {}
+
+    override fun onClick(x: Float, y: Float) {
+        val state = CarBridge.currentState
+
+        // 1. Report Incident (Orange Megaphone Button)
+        if (reportBtnRect.contains(x, y)) {
+            screenManager.push(DarbCarReportScreen(carContext))
+            return
+        }
+
+        // 2. Search Bar / Voice Search Button
+        if (searchBarRect.contains(x, y) || voiceBtnRect.contains(x, y)) {
+            screenManager.push(DarbCarSearchScreen(carContext))
+            return
+        }
+
+        // 3. Home Quick Pill
+        if (homeBtnRect.contains(x, y)) {
+            if (state.homeLat != 0.0 && state.homeLon != 0.0) {
+                CarBridge.notifyDestinationSelected("home", state.homeLat, state.homeLon)
+            } else {
+                screenManager.push(DarbCarSavedPlacesScreen(carContext))
+            }
+            return
+        }
+
+        // 4. Work Quick Pill
+        if (workBtnRect.contains(x, y)) {
+            if (state.workLat != 0.0 && state.workLon != 0.0) {
+                CarBridge.notifyDestinationSelected("work", state.workLat, state.workLon)
+            } else {
+                screenManager.push(DarbCarSavedPlacesScreen(carContext))
+            }
+            return
+        }
+
+        // 5. Saved Places
+        if (savedBtnRect.contains(x, y)) {
+            screenManager.push(DarbCarSavedPlacesScreen(carContext))
+            return
+        }
+
+        // 6. Park Spot (Save or Navigate to Parked Car)
+        if (parkingBtnRect.contains(x, y)) {
+            if (state.parkedLat != 0.0 && state.parkedLon != 0.0) {
+                // Navigate to parked car
+                CarBridge.notifyDestinationSelected("parked-car", state.parkedLat, state.parkedLon)
+            } else {
+                // Save current location as parking spot
+                CarBridge.notifySaveParkingSpot()
+            }
+            return
+        }
+
+        // 7. Stop Navigation
+        if (stopNavBtnRect.contains(x, y)) {
+            CarBridge.notifyStopNavigation()
+            return
+        }
+
+        // 8. Satellite Map Toggle
+        if (satelliteBtnRect.contains(x, y)) {
+            isSatelliteManual = !isSatelliteManual
+            renderSurface()
+            return
+        }
+    }
 
     // ---------------------------------------------------------
     // CarBridge State Listener
@@ -157,9 +236,16 @@ class DarbCarScreen(carContext: CarContext) : Screen(carContext),
     private fun buildNavigatingTemplate(state: CarNavState): Template {
         try {
             val voiceAction = Action.Builder()
-                .setTitle(if (state.arabic) "🎤 بحث صوتي" else "🎤 Voice")
+                .setTitle(if (state.arabic) "🎤 بحث" else "🎤 Search")
                 .setOnClickListener {
                     screenManager.push(DarbCarSearchScreen(carContext))
+                }
+                .build()
+
+            val reportAction = Action.Builder()
+                .setTitle(if (state.arabic) "📢 إبلاغ" else "📢 Report")
+                .setOnClickListener {
+                    screenManager.push(DarbCarReportScreen(carContext))
                 }
                 .build()
 
@@ -172,6 +258,7 @@ class DarbCarScreen(carContext: CarContext) : Screen(carContext),
 
             val actionStrip = ActionStrip.Builder()
                 .addAction(voiceAction)
+                .addAction(reportAction)
                 .addAction(stopAction)
                 .build()
 
@@ -232,53 +319,42 @@ class DarbCarScreen(carContext: CarContext) : Screen(carContext),
         try {
             val actions = ActionStrip.Builder()
 
-            // 1. Voice Search Action
+            // 1. Voice / Search Action
             actions.addAction(
                 Action.Builder()
-                    .setTitle(if (state.arabic) "🎤 بحث صوتي" else "🎤 Voice Search")
+                    .setTitle(if (state.arabic) "🎤 بحث" else "🎤 Search")
                     .setOnClickListener {
                         screenManager.push(DarbCarSearchScreen(carContext))
                     }
                     .build()
             )
 
-            // 2. Home Quick Action (if available)
-            if (state.homeLat != 0.0 && state.homeLon != 0.0) {
-                actions.addAction(
-                    Action.Builder()
-                        .setTitle(if (state.arabic) "🏠 المنزل" else "🏠 Home")
-                        .setOnClickListener {
-                            CarBridge.notifyDestinationSelected("home", state.homeLat, state.homeLon)
-                        }
-                        .build()
-                )
-            }
+            // 2. Report Action
+            actions.addAction(
+                Action.Builder()
+                    .setTitle(if (state.arabic) "📢 إبلاغ" else "📢 Report")
+                    .setOnClickListener {
+                        screenManager.push(DarbCarReportScreen(carContext))
+                    }
+                    .build()
+            )
 
-            // 3. Work Quick Action (if available)
-            if (state.workLat != 0.0 && state.workLon != 0.0) {
-                actions.addAction(
-                    Action.Builder()
-                        .setTitle(if (state.arabic) "💼 العمل" else "💼 Work")
-                        .setOnClickListener {
-                            CarBridge.notifyDestinationSelected("work", state.workLat, state.workLon)
-                        }
-                        .build()
-                )
-            }
-
-            // 4. Parked Car Action (if saved)
-            if (state.parkedLat != 0.0 && state.parkedLon != 0.0) {
-                actions.addAction(
-                    Action.Builder()
-                        .setTitle(if (state.arabic) "🅿️ سيارتي" else "🅿️ Parked Car")
-                        .setOnClickListener {
+            // 3. Parking Spot Action
+            val hasParked = state.parkedLat != 0.0 && state.parkedLon != 0.0
+            actions.addAction(
+                Action.Builder()
+                    .setTitle(if (hasParked) (if (state.arabic) "🅿️ سيارتي" else "🅿️ Parked Car") else (if (state.arabic) "🅿️ حفظ موقف" else "🅿️ Save Spot"))
+                    .setOnClickListener {
+                        if (hasParked) {
                             CarBridge.notifyDestinationSelected("parked-car", state.parkedLat, state.parkedLon)
+                        } else {
+                            CarBridge.notifySaveParkingSpot()
                         }
-                        .build()
-                )
-            }
+                    }
+                    .build()
+            )
 
-            // 5. Saved Places
+            // 4. Saved Places
             actions.addAction(
                 Action.Builder()
                     .setTitle(if (state.arabic) "⭐ المفضلة" else "⭐ Saved")
@@ -328,7 +404,7 @@ class DarbCarScreen(carContext: CarContext) : Screen(carContext),
         val h = canvas.height.toFloat().coerceAtLeast(400f)
         val state = CarBridge.currentState
         val dark = state.dark
-        val isSatellite = state.satellite
+        val isSatellite = isSatelliteManual || state.satellite
 
         // 1. Canvas Base Background
         val bgColor = if (isSatellite) {
@@ -349,7 +425,7 @@ class DarbCarScreen(carContext: CarContext) : Screen(carContext),
         val worldY = ((1.0 - Math.log(Math.tan(latRad) + 1.0 / Math.cos(latRad)) / Math.PI) / 2.0) * worldSize
 
         val carX = w * 0.5f
-        val carY = if (state.isNavigating) h * 0.62f else h * 0.5f
+        val carY = if (state.isNavigating) h * 0.55f else h * 0.46f
 
         canvas.save()
         canvas.translate(carX, carY)
@@ -537,64 +613,33 @@ class DarbCarScreen(carContext: CarContext) : Screen(carContext),
         canvas.restore()
 
         // -------------------------------------------------------------
-        // 6. UI Overlays (Matching Phone Landscape Layout)
+        // 6. UI Overlays (Full Landscape Phone Layout With Touch Hitboxes)
         // -------------------------------------------------------------
 
-        // Speedometer (Waze Circular Glass Badge)
-        val spCenter = w - 62f
-        val spY = h - 62f
-        val spRadius = 38f
-
-        val spBg = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.parseColor("#E60F172A")
+        // Top Left: Satellite View Button
+        satelliteBtnRect.set(16f, 16f, 136f, 52f)
+        val satBg = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#D90F172A")
             style = Paint.Style.FILL
         }
-        val spRing = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.parseColor("#00D2FF")
+        val satBorder = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = if (isSatellite) Color.parseColor("#00D2FF") else Color.parseColor("#334155")
             style = Paint.Style.STROKE
-            strokeWidth = 3f
+            strokeWidth = 1.5f
         }
-        canvas.drawCircle(spCenter, spY, spRadius, spBg)
-        canvas.drawCircle(spCenter, spY, spRadius, spRing)
-
-        val spNumText = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.WHITE
-            textSize = 28f
-            textAlign = Paint.Align.CENTER
+        canvas.drawRoundRect(satelliteBtnRect, 14f, 14f, satBg)
+        canvas.drawRoundRect(satelliteBtnRect, 14f, 14f, satBorder)
+        val satText = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = if (isSatellite) Color.parseColor("#00D2FF") else Color.WHITE
+            textSize = 12f
             isFakeBoldText = true
-        }
-        val spUnitText = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.parseColor("#38BDF8")
-            textSize = 10f
-            textAlign = Paint.Align.CENTER
-            isFakeBoldText = true
-        }
-        canvas.drawText("${state.speedKmh}", spCenter, spY + 4f, spNumText)
-        canvas.drawText(if (state.arabic) "كم/س" else "km/h", spCenter, spY + 20f, spUnitText)
-
-        // Orange Report Button
-        val repCenter = w - 148f
-        val repY = h - 62f
-        val repRadius = 26f
-        val repBg = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.parseColor("#FF6D00")
-            style = Paint.Style.FILL
-        }
-        val repShadow = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.parseColor("#40000000")
-            style = Paint.Style.FILL
-        }
-        canvas.drawCircle(repCenter, repY + 2f, repRadius, repShadow)
-        canvas.drawCircle(repCenter, repY, repRadius, repBg)
-        val repIconText = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.WHITE
-            textSize = 22f
             textAlign = Paint.Align.CENTER
         }
-        canvas.drawText("📢", repCenter, repY + 8f, repIconText)
+        val satLabel = if (isSatellite) (if (state.arabic) "🛰️ قمر صناعي" else "🛰️ Satellite") else (if (state.arabic) "🗺️ شوارع" else "🗺️ Streets")
+        canvas.drawText(satLabel, satelliteBtnRect.centerX(), satelliteBtnRect.centerY() + 4f, satText)
 
-        // App Status Branding Badge (Top Right)
-        val brandBox = android.graphics.RectF(w - 170f, 16f, w - 16f, 52f)
+        // Top Right: App Status Branding Badge
+        val brandBox = RectF(w - 170f, 16f, w - 16f, 52f)
         val brandBg = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.parseColor("#D90F172A")
             style = Paint.Style.FILL
@@ -624,5 +669,245 @@ class DarbCarScreen(carContext: CarContext) : Screen(carContext),
             if (state.arabic) "درب • متصل بالسيارة" else "Darb • Connected"
         }
         canvas.drawText(brandLabel, brandBox.left + 30f, brandBox.centerY() + 5f, brandText)
+
+        // -------------------------------------------------------------
+        // Bottom Landscape Control Bar (Matching Phone Exactly)
+        // -------------------------------------------------------------
+        val panelHeight = 60f
+        val panelBottom = h - 14f
+        val panelTop = panelBottom - panelHeight
+
+        // Speedometer (Waze Circular Glass Ring)
+        val spCenter = w - 46f
+        val spY = panelTop + panelHeight / 2f
+        val spRadius = 30f
+
+        val spBg = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#E60F172A")
+            style = Paint.Style.FILL
+        }
+        val spRing = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#00D2FF")
+            style = Paint.Style.STROKE
+            strokeWidth = 3f
+        }
+        canvas.drawCircle(spCenter, spY, spRadius, spBg)
+        canvas.drawCircle(spCenter, spY, spRadius, spRing)
+
+        val spNumText = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.WHITE
+            textSize = 22f
+            textAlign = Paint.Align.CENTER
+            isFakeBoldText = true
+        }
+        val spUnitText = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#38BDF8")
+            textSize = 9f
+            textAlign = Paint.Align.CENTER
+            isFakeBoldText = true
+        }
+        canvas.drawText("${state.speedKmh}", spCenter, spY + 3f, spNumText)
+        canvas.drawText(if (state.arabic) "كم/س" else "km/h", spCenter, spY + 16f, spUnitText)
+
+        // Orange Report Megaphone Button
+        val repCenter = spCenter - 58f
+        val repY = spY
+        val repRadius = 24f
+        reportBtnRect.set(repCenter - 26f, repY - 26f, repCenter + 26f, repY + 26f)
+
+        val repBg = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#FF6D00")
+            style = Paint.Style.FILL
+        }
+        val repShadow = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#50000000")
+            style = Paint.Style.FILL
+        }
+        canvas.drawCircle(repCenter, repY + 2f, repRadius, repShadow)
+        canvas.drawCircle(repCenter, repY, repRadius, repBg)
+        val repIconText = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.WHITE
+            textSize = 20f
+            textAlign = Paint.Align.CENTER
+        }
+        canvas.drawText("📢", repCenter, repY + 7f, repIconText)
+
+        if (state.isNavigating) {
+            // ==================== NAVIGATING MODE CONTROLS ====================
+            // Stop Navigation Button (Red Glass Pill)
+            stopNavBtnRect.set(16f, panelTop + 6f, 150f, panelBottom - 6f)
+            val stopBg = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.parseColor("#D9EF4444")
+                style = Paint.Style.FILL
+            }
+            val stopBorder = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.WHITE
+                style = Paint.Style.STROKE
+                strokeWidth = 1.5f
+            }
+            canvas.drawRoundRect(stopNavBtnRect, 14f, 14f, stopBg)
+            canvas.drawRoundRect(stopNavBtnRect, 14f, 14f, stopBorder)
+            val stopText = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.WHITE
+                textSize = 13f
+                isFakeBoldText = true
+                textAlign = Paint.Align.CENTER
+            }
+            canvas.drawText(if (state.arabic) "🛑 إنهاء الملاحة" else "🛑 End Route", stopNavBtnRect.centerX(), stopNavBtnRect.centerY() + 4f, stopText)
+
+            // Save Parking Spot Button While Navigating
+            parkingBtnRect.set(160f, panelTop + 6f, 300f, panelBottom - 6f)
+            val parkBg = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.parseColor("#D90F172A")
+                style = Paint.Style.FILL
+            }
+            val parkBorder = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.parseColor("#00D2FF")
+                style = Paint.Style.STROKE
+                strokeWidth = 1.5f
+            }
+            canvas.drawRoundRect(parkingBtnRect, 14f, 14f, parkBg)
+            canvas.drawRoundRect(parkingBtnRect, 14f, 14f, parkBorder)
+            val parkText = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.WHITE
+                textSize = 12f
+                isFakeBoldText = true
+                textAlign = Paint.Align.CENTER
+            }
+            val hasParked = state.parkedLat != 0.0 && state.parkedLon != 0.0
+            canvas.drawText(if (hasParked) (if (state.arabic) "🅿️ موقع سيارتي" else "🅿️ My Car") else (if (state.arabic) "🅿️ حفظ الموقف" else "🅿️ Save Spot"), parkingBtnRect.centerX(), parkingBtnRect.centerY() + 4f, parkText)
+
+            // Reset unused hitboxes
+            searchBarRect.setEmpty()
+            voiceBtnRect.setEmpty()
+            homeBtnRect.setEmpty()
+            workBtnRect.setEmpty()
+            savedBtnRect.setEmpty()
+
+        } else {
+            // ==================== IDLE MODE CONTROLS (FULL PHONE LANDSCAPE BAR) ====================
+            stopNavBtnRect.setEmpty()
+
+            // Main Background Panel Frame
+            val panelLeft = 14f
+            val panelRight = repCenter - 34f
+            val panelBox = RectF(panelLeft, panelTop, panelRight, panelBottom)
+
+            val pBg = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.parseColor("#E60F172A")
+                style = Paint.Style.FILL
+            }
+            val pBorder = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.parseColor("#1E293B")
+                style = Paint.Style.STROKE
+                strokeWidth = 1.5f
+            }
+            canvas.drawRoundRect(panelBox, 18f, 18f, pBg)
+            canvas.drawRoundRect(panelBox, 18f, 18f, pBorder)
+
+            // 1. Search Bar (Where to?)
+            val searchW = ((panelRight - panelLeft) * 0.32f).coerceIn(140f, 240f)
+            searchBarRect.set(panelLeft + 8f, panelTop + 7f, panelLeft + 8f + searchW, panelBottom - 7f)
+            val sbBg = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.parseColor("#1E293B")
+                style = Paint.Style.FILL
+            }
+            val sbBorder = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.parseColor("#00D2FF")
+                style = Paint.Style.STROKE
+                strokeWidth = 1.2f
+            }
+            canvas.drawRoundRect(searchBarRect, 14f, 14f, sbBg)
+            canvas.drawRoundRect(searchBarRect, 14f, 14f, sbBorder)
+            val sbText = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.parseColor("#E2E8F0")
+                textSize = 12f
+                isFakeBoldText = true
+            }
+            canvas.drawText(if (state.arabic) "🔍 إلى أين تريد الذهاب؟" else "🔍 Where to?", searchBarRect.left + 10f, searchBarRect.centerY() + 4f, sbText)
+
+            // 2. Voice Search Button
+            val vX = searchBarRect.right + 6f
+            voiceBtnRect.set(vX, panelTop + 7f, vX + 40f, panelBottom - 7f)
+            val vBg = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.parseColor("#1E293B")
+                style = Paint.Style.FILL
+            }
+            canvas.drawRoundRect(voiceBtnRect, 14f, 14f, vBg)
+            val vText = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                textSize = 15f
+                textAlign = Paint.Align.CENTER
+            }
+            canvas.drawText("🎤", voiceBtnRect.centerX(), voiceBtnRect.centerY() + 5f, vText)
+
+            // 3. Home Quick Pill
+            val hX = voiceBtnRect.right + 6f
+            homeBtnRect.set(hX, panelTop + 8f, hX + 72f, panelBottom - 8f)
+            val hBg = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.parseColor("#162032")
+                style = Paint.Style.FILL
+            }
+            val hBorder = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.parseColor("#0284C7")
+                style = Paint.Style.STROKE
+                strokeWidth = 1f
+            }
+            canvas.drawRoundRect(homeBtnRect, 12f, 12f, hBg)
+            canvas.drawRoundRect(homeBtnRect, 12f, 12f, hBorder)
+            val hText = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.WHITE
+                textSize = 11f
+                isFakeBoldText = true
+                textAlign = Paint.Align.CENTER
+            }
+            canvas.drawText(if (state.arabic) "🏠 منزل" else "🏠 Home", homeBtnRect.centerX(), homeBtnRect.centerY() + 4f, hText)
+
+            // 4. Work Quick Pill
+            val wX = homeBtnRect.right + 6f
+            workBtnRect.set(wX, panelTop + 8f, wX + 72f, panelBottom - 8f)
+            val wBorder = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.parseColor("#9333EA")
+                style = Paint.Style.STROKE
+                strokeWidth = 1f
+            }
+            canvas.drawRoundRect(workBtnRect, 12f, 12f, hBg)
+            canvas.drawRoundRect(workBtnRect, 12f, 12f, wBorder)
+            canvas.drawText(if (state.arabic) "💼 عمل" else "💼 Work", workBtnRect.centerX(), workBtnRect.centerY() + 4f, hText)
+
+            // 5. Saved Places Pill
+            val sX = workBtnRect.right + 6f
+            savedBtnRect.set(sX, panelTop + 8f, sX + 78f, panelBottom - 8f)
+            val sBorder = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.parseColor("#F59E0B")
+                style = Paint.Style.STROKE
+                strokeWidth = 1f
+            }
+            canvas.drawRoundRect(savedBtnRect, 12f, 12f, hBg)
+            canvas.drawRoundRect(savedBtnRect, 12f, 12f, sBorder)
+            canvas.drawText(if (state.arabic) "⭐ مفضلة" else "⭐ Saved", savedBtnRect.centerX(), savedBtnRect.centerY() + 4f, hText)
+
+            // 6. Park Spot Pill
+            val pkX = savedBtnRect.right + 6f
+            val hasParked = state.parkedLat != 0.0 && state.parkedLon != 0.0
+            parkingBtnRect.set(pkX, panelTop + 8f, (panelRight - 8f).coerceAtLeast(pkX + 80f), panelBottom - 8f)
+            val pkBg = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = if (hasParked) Color.parseColor("#153243") else Color.parseColor("#162032")
+                style = Paint.Style.FILL
+            }
+            val pkBorder = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = if (hasParked) Color.parseColor("#00E676") else Color.parseColor("#00D2FF")
+                style = Paint.Style.STROKE
+                strokeWidth = 1.2f
+            }
+            canvas.drawRoundRect(parkingBtnRect, 12f, 12f, pkBg)
+            canvas.drawRoundRect(parkingBtnRect, 12f, 12f, pkBorder)
+            val pkText = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = if (hasParked) Color.parseColor("#00E676") else Color.WHITE
+                textSize = 11f
+                isFakeBoldText = true
+                textAlign = Paint.Align.CENTER
+            }
+            canvas.drawText(if (hasParked) (if (state.arabic) "🅿️ سيارتي" else "🅿️ My Car") else (if (state.arabic) "🅿️ حفظ موقف" else "🅿️ Save Spot"), parkingBtnRect.centerX(), parkingBtnRect.centerY() + 4f, pkText)
+        }
     }
 }
