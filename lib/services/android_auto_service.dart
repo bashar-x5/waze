@@ -170,6 +170,8 @@ class AndroidAutoService {
     var etaText = '';
     var remainingDistanceText = '';
     var stepDistMeters = 0.0;
+    var remainingMeters = 0.0;
+    var remainingSeconds = 0;
 
     if (r != null && p != null && r.steps.isNotEmpty) {
       final stepIdx = p.stepIndex.clamp(0, r.steps.length - 1);
@@ -177,6 +179,8 @@ class AndroidAutoService {
       etaText = controller.duration(p.remainingSeconds);
       remainingDistanceText = controller.distance(p.remainingMeters);
       stepDistMeters = p.stepRemainingMeters ?? step.distanceMeters;
+      remainingMeters = p.remainingMeters;
+      remainingSeconds = p.remainingSeconds.round();
     }
 
     var maneuverCode = 1; // Default Straight
@@ -201,16 +205,48 @@ class AndroidAutoService {
       }
     }
 
+    // Sample route polyline coordinates for native Android Auto surface rendering
+    final routePoints = <Map<String, double>>[];
+    if (r != null && r.points.isNotEmpty) {
+      final stepSize = (r.points.length / 50).ceil().clamp(1, 100);
+      for (var i = 0; i < r.points.length; i += stepSize) {
+        routePoints.add({
+          'lat': r.points[i].latitude,
+          'lon': r.points[i].longitude,
+        });
+      }
+      final lastPt = r.points.last;
+      routePoints.add({
+        'lat': lastPt.latitude,
+        'lon': lastPt.longitude,
+      });
+    }
+
+    final speedKmh = controller.speedKph.round();
+    final heading = controller.heading;
+    final pos = controller.position;
+    final dest = controller.destination;
+
     try {
       _channel.invokeMethod('updateNavState', {
         'isNavigating': navigating,
         'instruction': step != null ? step.label(arabic) : '',
         'distanceText': step != null ? controller.distance(step.distanceMeters) : '',
         'stepDistanceMeters': stepDistMeters,
+        'remainingMeters': remainingMeters,
+        'remainingSeconds': remainingSeconds,
         'etaText': etaText,
         'remainingDistanceText': remainingDistanceText,
         'roadName': step?.roadName ?? '',
         'maneuverType': maneuverCode,
+        'speedKmh': speedKmh,
+        'heading': heading,
+        'lat': pos.latitude,
+        'lon': pos.longitude,
+        'destName': dest?.label(arabic) ?? '',
+        'destLat': dest?.point.latitude ?? 0.0,
+        'destLon': dest?.point.longitude ?? 0.0,
+        'routePoints': routePoints,
       });
     } catch (_) {}
   }

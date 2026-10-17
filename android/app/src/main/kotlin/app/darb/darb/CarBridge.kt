@@ -6,15 +6,30 @@ import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 
+data class CarRoutePoint(
+    val lat: Double,
+    val lon: Double
+)
+
 data class CarNavState(
     val isNavigating: Boolean = false,
     val instruction: String = "",
     val distanceText: String = "",
     val stepDistanceMeters: Double = 0.0,
+    val remainingMeters: Double = 0.0,
+    val remainingSeconds: Int = 0,
     val etaText: String = "",
     val remainingDistanceText: String = "",
     val roadName: String = "",
-    val maneuverType: Int = 1 // Default straight
+    val maneuverType: Int = 1, // Default straight
+    val speedKmh: Int = 0,
+    val heading: Float = 0f,
+    val lat: Double = 33.3152, // Default Baghdad Center
+    val lon: Double = 44.3661,
+    val destName: String = "",
+    val destLat: Double = 0.0,
+    val destLon: Double = 0.0,
+    val routePoints: List<CarRoutePoint> = emptyList()
 )
 
 data class CarSavedPlace(
@@ -103,20 +118,50 @@ object CarBridge : MethodChannel.MethodCallHandler {
                 val instruction = args?.get("instruction") as? String ?: ""
                 val distanceText = args?.get("distanceText") as? String ?: ""
                 val stepDistanceMeters = (args?.get("stepDistanceMeters") as? Number)?.toDouble() ?: 0.0
+                val remainingMeters = (args?.get("remainingMeters") as? Number)?.toDouble() ?: 0.0
+                val remainingSeconds = (args?.get("remainingSeconds") as? Number)?.toInt() ?: 0
                 val etaText = args?.get("etaText") as? String ?: ""
                 val remainingDist = args?.get("remainingDistanceText") as? String ?: ""
                 val roadName = args?.get("roadName") as? String ?: ""
                 val maneuver = (args?.get("maneuverType") as? Number)?.toInt() ?: 1
+                val speedKmh = (args?.get("speedKmh") as? Number)?.toInt() ?: 0
+                val heading = (args?.get("heading") as? Number)?.toFloat() ?: 0f
+                val lat = (args?.get("lat") as? Number)?.toDouble() ?: 33.3152
+                val lon = (args?.get("lon") as? Number)?.toDouble() ?: 44.3661
+                val destName = args?.get("destName") as? String ?: ""
+                val destLat = (args?.get("destLat") as? Number)?.toDouble() ?: 0.0
+                val destLon = (args?.get("destLon") as? Number)?.toDouble() ?: 0.0
+
+                val routePointsList = mutableListOf<CarRoutePoint>()
+                (args?.get("routePoints") as? List<*>)?.forEach { pt ->
+                    if (pt is Map<*, *>) {
+                        val pLat = (pt["lat"] as? Number)?.toDouble() ?: 0.0
+                        val pLon = (pt["lon"] as? Number)?.toDouble() ?: 0.0
+                        if (pLat != 0.0 || pLon != 0.0) {
+                            routePointsList.add(CarRoutePoint(pLat, pLon))
+                        }
+                    }
+                }
 
                 currentState = CarNavState(
                     isNavigating = isNavigating,
                     instruction = instruction,
                     distanceText = distanceText,
                     stepDistanceMeters = stepDistanceMeters,
+                    remainingMeters = remainingMeters,
+                    remainingSeconds = remainingSeconds,
                     etaText = etaText,
                     remainingDistanceText = remainingDist,
                     roadName = roadName,
-                    maneuverType = maneuver
+                    maneuverType = maneuver,
+                    speedKmh = speedKmh,
+                    heading = heading,
+                    lat = lat,
+                    lon = lon,
+                    destName = destName,
+                    destLat = destLat,
+                    destLon = destLon,
+                    routePoints = routePointsList
                 )
 
                 mainHandler.post {
