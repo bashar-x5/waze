@@ -935,6 +935,24 @@ class AppController extends ChangeNotifier {
         notice = '⚠️ $warningMsg';
       }
     }
+
+    // Alert driver of major upcoming traffic bottlenecks (Standstill or Heavy)
+    if (navigating && route != null) {
+      final trafficAlert = detectUpcomingTrafficJam(route!, position, lookaheadMeters: 1800.0);
+      if (trafficAlert != null &&
+          (trafficAlert.level == TrafficCongestionLevel.standstill ||
+              trafficAlert.level == TrafficCongestionLevel.heavy)) {
+        final alertKey = 'traffic_bottleneck_${(trafficAlert.distanceMeters / 400).round()}_${trafficAlert.level.name}';
+        if (!_announcedWarningIds.contains(alertKey)) {
+          _announcedWarningIds.add(alertKey);
+          final spoken = arabic
+              ? 'انتبه: ${trafficAlert.titleAr}'
+              : 'Caution: ${trafficAlert.title}';
+          _speak(spoken);
+          notice = '🛑 $spoken';
+        }
+      }
+    }
   }
 
   Future<void> checkForUpdates() async {

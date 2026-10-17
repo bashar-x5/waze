@@ -11,6 +11,10 @@ class UpcomingTrafficAlert {
     required this.estimatedSpeedKmh,
     required this.title,
     required this.titleAr,
+    this.jamLengthMeters = 0.0,
+    this.cause = '',
+    this.causeAr = '',
+    this.causeType,
   });
 
   final double distanceMeters;
@@ -19,6 +23,10 @@ class UpcomingTrafficAlert {
   final double estimatedSpeedKmh;
   final String title;
   final String titleAr;
+  final double jamLengthMeters;
+  final String cause;
+  final String causeAr;
+  final ReportType? causeType;
 }
 
 class BaghdadTrafficCorridor {
@@ -49,8 +57,8 @@ const baghdadTrafficCorridors = <BaghdadTrafficCorridor>[
     center: LatLng(33.3421, 44.4180),
     radiusMeters: 1400,
     severity: TrafficCongestionLevel.moderate,
-    congestedSpeedKmh: 34,
-    delaySeconds: 180, // +3 min
+    congestedSpeedKmh: 32,
+    delaySeconds: 300, // +5 min
   ),
   // 2. Al-Jadriya Bridge & Intersection (Busiest Karkh-Rusafa link)
   BaghdadTrafficCorridor(
@@ -60,7 +68,7 @@ const baghdadTrafficCorridors = <BaghdadTrafficCorridor>[
     radiusMeters: 800,
     severity: TrafficCongestionLevel.heavy,
     congestedSpeedKmh: 14,
-    delaySeconds: 320, // +5.3 min
+    delaySeconds: 660, // +11 min
   ),
   // 3. Al-Jumhuriya & Al-Senak Bridges / Tahrir Square
   BaghdadTrafficCorridor(
@@ -70,7 +78,7 @@ const baghdadTrafficCorridors = <BaghdadTrafficCorridor>[
     radiusMeters: 750,
     severity: TrafficCongestionLevel.heavy,
     congestedSpeedKmh: 12,
-    delaySeconds: 360, // +6 min
+    delaySeconds: 720, // +12 min
   ),
   // 4. Damascus Square & Nisour Junction (Central Karkh)
   BaghdadTrafficCorridor(
@@ -80,7 +88,7 @@ const baghdadTrafficCorridors = <BaghdadTrafficCorridor>[
     radiusMeters: 800,
     severity: TrafficCongestionLevel.moderate,
     congestedSpeedKmh: 24,
-    delaySeconds: 220, // +3.6 min
+    delaySeconds: 300, // +5 min
   ),
   // 5. 14th of Ramadan Street (Al-Mansour)
   BaghdadTrafficCorridor(
@@ -90,7 +98,7 @@ const baghdadTrafficCorridors = <BaghdadTrafficCorridor>[
     radiusMeters: 850,
     severity: TrafficCongestionLevel.moderate,
     congestedSpeedKmh: 22,
-    delaySeconds: 240, // +4 min
+    delaySeconds: 300, // +5 min
   ),
   // 6. Palestine Street (Beirut Square)
   BaghdadTrafficCorridor(
@@ -100,7 +108,7 @@ const baghdadTrafficCorridors = <BaghdadTrafficCorridor>[
     radiusMeters: 950,
     severity: TrafficCongestionLevel.moderate,
     congestedSpeedKmh: 26,
-    delaySeconds: 200, // +3.3 min
+    delaySeconds: 300, // +5 min
   ),
   // 7. Al-Karrada Dakhil
   BaghdadTrafficCorridor(
@@ -109,18 +117,18 @@ const baghdadTrafficCorridors = <BaghdadTrafficCorridor>[
     center: LatLng(33.3050, 44.4250),
     radiusMeters: 900,
     severity: TrafficCongestionLevel.heavy,
-    congestedSpeedKmh: 15,
-    delaySeconds: 300, // +5 min
+    congestedSpeedKmh: 14,
+    delaySeconds: 600, // +10 min
   ),
-  // 8. Bab Al-Muadham Bridge & Medical City
+  // 8. Bab Al-Muadham Bridge & Medical City (Standstill bottleneck)
   BaghdadTrafficCorridor(
     name: 'Bab Al-Muadham Bridge',
     nameAr: 'جسر باب المعظم',
     center: LatLng(33.3582, 44.3814),
     radiusMeters: 700,
     severity: TrafficCongestionLevel.standstill,
-    congestedSpeedKmh: 8,
-    delaySeconds: 420, // +7 min
+    congestedSpeedKmh: 6,
+    delaySeconds: 1020, // +17 min (Realistic Standstill)
   ),
   // 9. Yarmouk & Airport Road Junction
   BaghdadTrafficCorridor(
@@ -130,7 +138,7 @@ const baghdadTrafficCorridors = <BaghdadTrafficCorridor>[
     radiusMeters: 850,
     severity: TrafficCongestionLevel.moderate,
     congestedSpeedKmh: 28,
-    delaySeconds: 180, // +3 min
+    delaySeconds: 240, // +4 min
   ),
   // 10. Bab Al-Sharqi & Tayaran Square
   BaghdadTrafficCorridor(
@@ -140,7 +148,7 @@ const baghdadTrafficCorridors = <BaghdadTrafficCorridor>[
     radiusMeters: 700,
     severity: TrafficCongestionLevel.heavy,
     congestedSpeedKmh: 10,
-    delaySeconds: 340, // +5.6 min
+    delaySeconds: 660, // +11 min
   ),
 ];
 
@@ -190,11 +198,6 @@ List<DriveRoute> calculateTrafficAndRankRoutes(
       // If report is within 95 meters of this route corridor
       if (closestIndex != null && minDistance <= 95.0) {
         incidentsOnRoute.add(report);
-        final delay = _delayForReport(report);
-        totalTrafficDelay += delay;
-
-        final level = _levelForReport(report);
-        final speed = _speedForLevel(level);
 
         final startIdx = max(0, closestIndex - 2);
         final endIdx = min(route.points.length - 1, closestIndex + 3);
@@ -205,6 +208,17 @@ List<DriveRoute> calculateTrafficAndRankRoutes(
 
         final segmentPoints = route.points.sublist(startIdx, endIdx + 1);
         congestedPoints.addAll(segmentPoints);
+
+        double segLength = 0;
+        for (var k = 0; k < segmentPoints.length - 1; k++) {
+          segLength += distanceCalc.as(LengthUnit.Meter, segmentPoints[k], segmentPoints[k + 1]);
+        }
+
+        final delay = _delayForReport(report, segmentLengthMeters: segLength);
+        totalTrafficDelay += delay;
+
+        final level = _levelForReport(report);
+        final speed = _speedForLevel(level);
 
         final desc = report.description.isNotEmpty ? report.description : _defaultDescription(level);
 
@@ -241,14 +255,26 @@ List<DriveRoute> calculateTrafficAndRankRoutes(
 
         final segPoints = route.points.sublist(minIdx, maxIdx + 1);
         congestedPoints.addAll(segPoints);
-        totalTrafficDelay += corridor.delaySeconds;
+
+        double corridorLength = 0;
+        for (var k = 0; k < segPoints.length - 1; k++) {
+          corridorLength += distanceCalc.as(LengthUnit.Meter, segPoints[k], segPoints[k + 1]);
+        }
+
+        final dynamicCorridorDelay = corridor.severity == TrafficCongestionLevel.standstill
+            ? max(corridor.delaySeconds, 900.0 + (corridorLength / 1000.0) * 600.0)
+            : (corridor.severity == TrafficCongestionLevel.heavy
+                ? max(corridor.delaySeconds, 540.0 + (corridorLength / 1000.0) * 250.0)
+                : max(corridor.delaySeconds, 240.0 + (corridorLength / 1000.0) * 90.0));
+
+        totalTrafficDelay += dynamicCorridorDelay;
 
         trafficSegments.add(
           RouteTrafficSegment(
             points: segPoints,
             level: corridor.severity,
             estimatedSpeedKmh: corridor.congestedSpeedKmh,
-            delaySeconds: corridor.delaySeconds,
+            delaySeconds: dynamicCorridorDelay,
             description: '${corridor.nameAr} (${corridor.name})',
           ),
         );
@@ -313,21 +339,77 @@ UpcomingTrafficAlert? detectUpcomingTrafficJam(
       final delayMin = max(1, (segment.delaySeconds / 60).round());
       final speed = segment.estimatedSpeedKmh.round();
 
+      // Calculate actual physical length of the bottleneck along segment points
+      double jamLength = 0;
+      for (var i = 0; i < segment.points.length - 1; i++) {
+        jamLength += distanceCalc.as(LengthUnit.Meter, segment.points[i], segment.points[i + 1]);
+      }
+      jamLength = jamLength.clamp(250.0, 10000.0);
+
+      final lengthStrAr = jamLength >= 1000
+          ? '${(jamLength / 1000).toStringAsFixed(1)} كم'
+          : '${jamLength.round()} م';
+      final lengthStrEn = jamLength >= 1000
+          ? '${(jamLength / 1000).toStringAsFixed(1)} km'
+          : '${jamLength.round()} m';
+
+      // Detect matching cause from active route incident alerts
+      ReportType? matchedCauseType;
+      String causeEn = '';
+      String causeAr = '';
+
+      for (final report in route.incidentAlerts) {
+        if (!report.isActive) continue;
+        final d = distanceCalc.as(LengthUnit.Meter, report.point, jamStart);
+        if (d <= 450.0) {
+          matchedCauseType = report.type;
+          switch (report.type) {
+            case ReportType.police:
+              causeEn = 'Checkpoint';
+              causeAr = 'سيطرة تفتيش';
+              break;
+            case ReportType.crash:
+              causeEn = 'Accident';
+              causeAr = 'حادث سير';
+              break;
+            case ReportType.closure:
+              causeEn = 'Road Closure';
+              causeAr = 'طريق مغلق';
+              break;
+            case ReportType.construction:
+              causeEn = 'Maintenance';
+              causeAr = 'أعمال صيانة';
+              break;
+            case ReportType.hazard:
+              causeEn = 'Hazard';
+              causeAr = 'خطر على الطريق';
+              break;
+            default:
+              break;
+          }
+          break;
+        }
+      }
+
       String title;
       String titleAr;
 
       switch (segment.level) {
         case TrafficCongestionLevel.standstill:
-          title = 'Standstill traffic ahead (+$delayMin m) · $speed km/h';
-          titleAr = 'ازدحام متوقف أمامك (+$delayMin د) · $speed كم/س';
+          final prefixAr = causeAr.isNotEmpty ? 'ازدحام متوقف ($causeAr)' : 'ازدحام متوقف أمامك';
+          final prefixEn = causeEn.isNotEmpty ? 'Standstill traffic ($causeEn)' : 'Standstill traffic ahead';
+          title = '$prefixEn (+$delayMin m) · $lengthStrEn long · $speed km/h';
+          titleAr = '$prefixAr (+$delayMin د) · يمتد $lengthStrAr · $speed كم/س';
           break;
         case TrafficCongestionLevel.heavy:
-          title = 'Heavy traffic ahead (+$delayMin m) · $speed km/h';
-          titleAr = 'ازدحام كثيف أمامك (+$delayMin د) · $speed كم/س';
+          final prefixAr = causeAr.isNotEmpty ? 'ازدحام كثيف ($causeAr)' : 'ازدحام كثيف أمامك';
+          final prefixEn = causeEn.isNotEmpty ? 'Heavy traffic ($causeEn)' : 'Heavy traffic ahead';
+          title = '$prefixEn (+$delayMin m) · $lengthStrEn long · $speed km/h';
+          titleAr = '$prefixAr (+$delayMin د) · يمتد $lengthStrAr · $speed كم/س';
           break;
         case TrafficCongestionLevel.moderate:
-          title = 'Moderate slowdown ahead (+$delayMin m) · $speed km/h';
-          titleAr = 'تباطؤ مروري أمامك (+$delayMin د) · $speed كم/س';
+          title = 'Moderate slowdown ahead (+$delayMin m) · $lengthStrEn · $speed km/h';
+          titleAr = 'تباطؤ مروري أمامك (+$delayMin د) · يمتد $lengthStrAr · $speed كم/س';
           break;
         case TrafficCongestionLevel.free:
           continue;
@@ -340,6 +422,10 @@ UpcomingTrafficAlert? detectUpcomingTrafficJam(
         estimatedSpeedKmh: segment.estimatedSpeedKmh,
         title: title,
         titleAr: titleAr,
+        jamLengthMeters: jamLength,
+        cause: causeEn,
+        causeAr: causeAr,
+        causeType: matchedCauseType,
       );
     }
   }
@@ -347,27 +433,43 @@ UpcomingTrafficAlert? detectUpcomingTrafficJam(
   return null;
 }
 
-double _delayForReport(RoadReport report) {
+double _delayForReport(RoadReport report, {double segmentLengthMeters = 0.0}) {
   switch (report.type) {
-    case ReportType.traffic:
-      // Base 5 min delay + 1.5 min per confirmation (up to 15 min)
-      return 300.0 + (report.confirmations * 90.0).clamp(0.0, 600.0);
-    case ReportType.crash:
-      // Base 8 min delay + 1.5 min per confirmation (up to 20 min)
-      return 480.0 + (report.confirmations * 90.0).clamp(0.0, 720.0);
     case ReportType.closure:
-      // Heavy 25 min penalty to avoid closed roads
-      return 1500.0;
+      // Road closure penalty: 30 minutes (1800s) to strictly ensure avoidance
+      return 1800.0;
+
+    case ReportType.crash:
+      // Accidents: Base 10 min delay (600s) + distance scaling + confirmations
+      final lengthPenalty = (segmentLengthMeters / 1000.0) * 300.0;
+      final confirmationBonus = (report.confirmations * 120.0).clamp(0.0, 600.0);
+      return (600.0 + lengthPenalty + confirmationBonus).clamp(600.0, 1800.0); // 10 to 30 min
+
+    case ReportType.traffic:
+      // Traffic jam:
+      // If confirmed (>= 2) or standstill: Base 15 min (900s) + distance scaling
+      // If moderate: Base 8 min (480s)
+      final isStandstill = report.confirmations >= 2;
+      final baseDelay = isStandstill ? 900.0 : 480.0;
+      final lengthPenalty = (segmentLengthMeters / 1000.0) * (isStandstill ? 600.0 : 250.0);
+      final confirmationBonus = (report.confirmations * 120.0).clamp(0.0, 600.0);
+      return (baseDelay + lengthPenalty + confirmationBonus).clamp(baseDelay, 2400.0); // 8-15 to 40 min
+
+    case ReportType.police:
+      // Security checkpoints: Base 8 min delay + distance scaling + confirmations
+      final lengthPenalty = (segmentLengthMeters / 1000.0) * 200.0;
+      final confirmationBonus = (report.confirmations * 120.0).clamp(0.0, 600.0);
+      return (480.0 + lengthPenalty + confirmationBonus).clamp(480.0, 1200.0); // 8 to 20 min
+
     case ReportType.construction:
-      return 240.0;
+      return 360.0 + (report.confirmations * 60.0).clamp(0.0, 300.0); // 6 to 11 min
     case ReportType.hazard:
     case ReportType.weather:
-      return 120.0;
-    case ReportType.police:
+      return 180.0 + (report.confirmations * 60.0).clamp(0.0, 240.0); // 3 to 7 min
     case ReportType.camera:
-      return 0.0; // Warnings only, no direct speed penalty
+      return 0.0; // Warnings only
     case ReportType.bump:
-      return 15.0; // 15-second localized slowdown for speed bumps
+      return 20.0; // 20s localized slowdown
   }
 }
 

@@ -903,47 +903,102 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 left: 16,
                 right: 76,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
                   decoration: BoxDecoration(
                     color: alert.level == TrafficCongestionLevel.standstill
-                        ? const Color(0xFF8B0000)
+                        ? const Color(0xFF7F1D1D)
                         : (alert.level == TrafficCongestionLevel.heavy
-                            ? WazeColors.red
-                            : const Color(0xFFFF9500)),
+                            ? const Color(0xFFDC2626)
+                            : const Color(0xFFD97706)),
                     borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.25),
+                      width: 1,
+                    ),
                     boxShadow: const [
-                      BoxShadow(color: Colors.black38, blurRadius: 6, offset: Offset(0, 3)),
+                      BoxShadow(color: Colors.black45, blurRadius: 8, offset: Offset(0, 3)),
                     ],
                   ),
-                  child: Row(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.traffic_rounded, color: Colors.white, size: 20),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          arabic ? alert.titleAr : alert.title,
-                          style: const TextStyle(
+                      Row(
+                        children: [
+                          Icon(
+                            alert.causeType == ReportType.police
+                                ? Icons.local_police_rounded
+                                : (alert.causeType == ReportType.crash
+                                    ? Icons.car_crash_rounded
+                                    : (alert.causeType == ReportType.construction
+                                        ? Icons.construction_rounded
+                                        : (alert.causeType == ReportType.closure
+                                            ? Icons.do_not_disturb_on_rounded
+                                            : Icons.traffic_rounded))),
                             color: Colors.white,
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
+                            size: 22,
                           ),
-                        ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              arabic ? alert.titleAr : alert.title,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withValues(alpha: 0.35),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              c.distance(alert.distanceMeters),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: Colors.black26,
+                      if (c.routes.length > 1) ...[
+                        const SizedBox(height: 6),
+                        InkWell(
+                          onTap: () {
+                            final nextIndex = (c.routeIndex + 1) % c.routes.length;
+                            c.selectRoute(nextIndex);
+                          },
                           borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          c.distance(alert.distanceMeters),
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
+                          child: Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(vertical: 5),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.22),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(Icons.alt_route_rounded, color: Colors.white, size: 15),
+                                const SizedBox(width: 6),
+                                Text(
+                                  arabic ? 'تحويل لمسار بديل أسرع' : 'Switch to faster alternate route',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
-                      ),
+                      ],
                     ],
                   ),
                 ),
