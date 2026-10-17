@@ -11,6 +11,7 @@ class WazeNavHud extends StatelessWidget {
     required this.arabic,
     required this.miles,
     required this.onTapList,
+    this.isLandscape = false,
   });
 
   final DriveRoute route;
@@ -18,6 +19,7 @@ class WazeNavHud extends StatelessWidget {
   final bool arabic;
   final bool miles;
   final VoidCallback onTapList;
+  final bool isLandscape;
 
   String _formatDistance(double meters) {
     if (miles) {
@@ -52,13 +54,20 @@ class WazeNavHud extends StatelessWidget {
     final distanceText = _formatDistance(distanceMeters);
 
     return SafeArea(
+      top: !isLandscape,
+      bottom: false,
+      left: false,
+      right: false,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        padding: EdgeInsets.symmetric(
+          horizontal: isLandscape ? 0 : 14,
+          vertical: isLandscape ? 0 : 8,
+        ),
         child: Material(
           color: Colors.transparent,
           child: InkWell(
             onTap: onTapList,
-            borderRadius: BorderRadius.circular(22),
+            borderRadius: BorderRadius.circular(isLandscape ? 16 : 22),
             child: Container(
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
@@ -66,29 +75,32 @@ class WazeNavHud extends StatelessWidget {
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
-                borderRadius: BorderRadius.circular(22),
+                borderRadius: BorderRadius.circular(isLandscape ? 16 : 22),
                 boxShadow: const [
                   BoxShadow(
                     color: Colors.black38,
-                    blurRadius: 12,
-                    offset: Offset(0, 4),
+                    blurRadius: 10,
+                    offset: Offset(0, 3),
                   ),
                 ],
               ),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              padding: EdgeInsets.symmetric(
+                horizontal: isLandscape ? 12 : 16,
+                vertical: isLandscape ? 8 : 14,
+              ),
               child: Row(
                 children: [
                   // Maneuver Icon
                   Container(
-                    width: 52,
-                    height: 52,
+                    width: isLandscape ? 38 : 52,
+                    height: isLandscape ? 38 : 52,
                     decoration: BoxDecoration(
                       color: Colors.white,
                       shape: BoxShape.circle,
                       boxShadow: const [
                         BoxShadow(
                           color: Colors.black26,
-                          blurRadius: 6,
+                          blurRadius: 4,
                           offset: Offset(0, 2),
                         ),
                       ],
@@ -96,12 +108,12 @@ class WazeNavHud extends StatelessWidget {
                     child: Center(
                       child: Icon(
                         maneuverIcon,
-                        size: 34,
+                        size: isLandscape ? 24 : 34,
                         color: const Color(0xFF006B9E),
                       ),
                     ),
                   ),
-                  const SizedBox(width: 14),
+                  SizedBox(width: isLandscape ? 10 : 14),
 
                   // Distance & Instruction
                   Expanded(
@@ -111,26 +123,27 @@ class WazeNavHud extends StatelessWidget {
                       children: [
                         Text(
                           distanceText,
-                          style: const TextStyle(
-                            fontSize: 25,
+                          style: TextStyle(
+                            fontSize: isLandscape ? 18 : 25,
                             fontWeight: FontWeight.w900,
                             color: Colors.white,
                             letterSpacing: -0.3,
+                            height: 1.0,
                           ),
                         ),
                         const SizedBox(height: 2),
                         Text(
                           instruction,
-                          maxLines: 2,
+                          maxLines: isLandscape ? 1 : 2,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 16,
+                          style: TextStyle(
+                            fontSize: isLandscape ? 13 : 16,
                             fontWeight: FontWeight.w800,
                             color: Colors.white,
-                            height: 1.25,
+                            height: 1.2,
                           ),
                         ),
-                        if (nextStep != null) ...[
+                        if (nextStep != null && !isLandscape) ...[
                           const SizedBox(height: 4),
                           Row(
                             children: [
@@ -163,15 +176,15 @@ class WazeNavHud extends StatelessWidget {
 
                   // List icon
                   Container(
-                    padding: const EdgeInsets.all(8),
+                    padding: EdgeInsets.all(isLandscape ? 6 : 8),
                     decoration: BoxDecoration(
                       color: Colors.white.withValues(alpha: 0.15),
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(
+                    child: Icon(
                       Icons.format_list_bulleted_rounded,
                       color: Colors.white,
-                      size: 20,
+                      size: isLandscape ? 16 : 20,
                     ),
                   ),
                 ],

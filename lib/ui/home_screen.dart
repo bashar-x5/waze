@@ -42,6 +42,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   bool _wasNavigating = false;
   bool _mapReady = false;
   bool _bottomPanelMinimized = false;
+  bool _dismissedRouteSwitch = false;
+  bool _dismissedTrafficAlert = false;
   Offset? _puckScreenOffset;
 
   late final AnimationController _pulseController;
@@ -209,6 +211,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       _followUser = true;
       _headingUp = true;
       _is3D = true;
+      _dismissedRouteSwitch = false;
+      _dismissedTrafficAlert = false;
       _animateCamera(
         target: _toMapLibre(c.position),
         zoom: 17.5,
@@ -221,6 +225,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
     if (justStopped) {
       _is3D = false;
+      _dismissedRouteSwitch = false;
+      _dismissedTrafficAlert = false;
       _animateCamera(
         target: _toMapLibre(c.position),
         zoom: 16.0,
@@ -855,6 +861,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     final c = widget.controller;
     final dark = c.dark;
     final arabic = c.arabic;
+    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
 
     return Scaffold(
       body: Stack(
@@ -874,14 +881,16 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           // Top Nav HUD (Visible when navigating)
           if (c.navigating && c.route != null && c.progress != null)
             Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
+              top: isLandscape ? 8 : 0,
+              left: isLandscape ? (arabic ? null : 12) : 0,
+              right: isLandscape ? (arabic ? 12 : null) : 0,
+              width: isLandscape ? 360 : null,
               child: WazeNavHud(
                 route: c.route!,
                 progress: c.progress!,
                 arabic: arabic,
                 miles: c.miles,
+                isLandscape: isLandscape,
                 onTapList: () {
                   showWazeTurnsSheet(
                     context,
@@ -896,14 +905,15 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             ),
 
           // Upcoming Traffic Bottleneck Alert Pill (Waze Traffic Bar)
-          if (c.navigating && c.route != null) ...[
+          if (c.navigating && c.route != null && !_dismissedTrafficAlert) ...[
             if (detectUpcomingTrafficJam(c.route!, c.position) case final alert?)
               Positioned(
-                top: 156,
-                left: 16,
-                right: 76,
+                top: isLandscape ? 66 : 156,
+                left: isLandscape ? (arabic ? null : 12) : 16,
+                right: isLandscape ? (arabic ? 12 : null) : 76,
+                width: isLandscape ? 360 : null,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
                   decoration: BoxDecoration(
                     color: alert.level == TrafficCongestionLevel.standstill
                         ? const Color(0xFF7F1D1D)
@@ -935,7 +945,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                             ? Icons.do_not_disturb_on_rounded
                                             : Icons.traffic_rounded))),
                             color: Colors.white,
-                            size: 22,
+                            size: 20,
                           ),
                           const SizedBox(width: 8),
                           Expanded(
@@ -946,11 +956,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                 fontSize: 12,
                                 fontWeight: FontWeight.w800,
                               ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
                           const SizedBox(width: 6),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                             decoration: BoxDecoration(
                               color: Colors.black.withValues(alpha: 0.35),
                               borderRadius: BorderRadius.circular(8),
@@ -964,10 +976,20 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                               ),
                             ),
                           ),
+                          const SizedBox(width: 4),
+                          // Close button to dismiss traffic alert
+                          InkWell(
+                            onTap: () => setState(() => _dismissedTrafficAlert = true),
+                            borderRadius: BorderRadius.circular(12),
+                            child: const Padding(
+                              padding: EdgeInsets.all(3),
+                              child: Icon(Icons.close_rounded, color: Colors.white70, size: 16),
+                            ),
+                          ),
                         ],
                       ),
                       if (c.routes.length > 1) ...[
-                        const SizedBox(height: 6),
+                        const SizedBox(height: 5),
                         InkWell(
                           onTap: () {
                             final nextIndex = (c.routeIndex + 1) % c.routes.length;
@@ -976,7 +998,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                           borderRadius: BorderRadius.circular(8),
                           child: Container(
                             width: double.infinity,
-                            padding: const EdgeInsets.symmetric(vertical: 5),
+                            padding: const EdgeInsets.symmetric(vertical: 4),
                             decoration: BoxDecoration(
                               color: Colors.white.withValues(alpha: 0.22),
                               borderRadius: BorderRadius.circular(8),
@@ -984,13 +1006,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                const Icon(Icons.alt_route_rounded, color: Colors.white, size: 15),
+                                const Icon(Icons.alt_route_rounded, color: Colors.white, size: 14),
                                 const SizedBox(width: 6),
                                 Text(
                                   arabic ? 'تحويل لمسار بديل أسرع' : 'Switch to faster alternate route',
                                   style: const TextStyle(
                                     color: Colors.white,
-                                    fontSize: 11.5,
+                                    fontSize: 11,
                                     fontWeight: FontWeight.bold,
                                   ),
                                 ),
@@ -1006,45 +1028,40 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           ],
 
           // Alternative Route Prompt Banner during navigation
-          if (c.navigating && c.routes.length > 1 && c.route != null) ...[
+          if (c.navigating && c.routes.length > 1 && c.route != null && !_dismissedRouteSwitch) ...[
             Builder(builder: (context) {
               final otherIdx = c.routeIndex == 0 ? 1 : 0;
               final otherRoute = c.routes[otherIdx];
               final diffSec = (otherRoute.totalDurationSeconds - c.route!.totalDurationSeconds).round();
-              final diffMin = (diffSec / 60).round();
 
-              final String label;
-              if (diffSec < -30) {
-                label = arabic
-                    ? 'مسار أسرع يوفر ${c.duration(diffSec.abs().toDouble())}'
-                    : 'Faster route saves ${c.duration(diffSec.abs().toDouble())}';
-              } else if (diffSec.abs() <= 30) {
-                label = arabic ? 'مسار بديل بنفس الوقت' : 'Alternative route (same ETA)';
-              } else {
-                label = arabic
-                    ? 'مسار بديل (+ ${c.duration(diffSec.toDouble())})'
-                    : 'Alternative route (+ ${c.duration(diffSec.toDouble())})';
-              }
+              // ONLY show if the alternative route is FASTER by at least 60 seconds!
+              // Never display a disruptive banner for routes with equal ETA or slower!
+              if (diffSec >= -60) return const SizedBox.shrink();
+
+              final label = arabic
+                  ? 'مسار أسرع يوفر ${c.duration(diffSec.abs().toDouble())}'
+                  : 'Faster route saves ${c.duration(diffSec.abs().toDouble())}';
 
               return Positioned(
-                top: 210,
-                left: 16,
-                right: 76,
+                top: isLandscape ? 66 : 156,
+                left: isLandscape ? (arabic ? null : 12) : 16,
+                right: isLandscape ? (arabic ? 12 : null) : 76,
+                width: isLandscape ? 360 : null,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
                   decoration: BoxDecoration(
-                    color: diffMin < 0 ? const Color(0xFF0D47A1) : const Color(0xFF37474F),
-                    borderRadius: BorderRadius.circular(16),
+                    color: const Color(0xFF0D47A1),
+                    borderRadius: BorderRadius.circular(14),
                     boxShadow: const [
-                      BoxShadow(color: Colors.black38, blurRadius: 6, offset: Offset(0, 3)),
+                      BoxShadow(color: Colors.black45, blurRadius: 6, offset: Offset(0, 3)),
                     ],
                   ),
                   child: Row(
                     children: [
-                      Icon(
-                        diffMin < 0 ? Icons.bolt_rounded : Icons.alt_route_rounded,
-                        color: diffMin < 0 ? Colors.amber : Colors.lightBlueAccent,
-                        size: 22,
+                      const Icon(
+                        Icons.bolt_rounded,
+                        color: Colors.amber,
+                        size: 20,
                       ),
                       const SizedBox(width: 8),
                       Expanded(
@@ -1055,20 +1072,38 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                             fontSize: 12,
                             fontWeight: FontWeight.bold,
                           ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
+                      const SizedBox(width: 6),
                       ElevatedButton(
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.white,
-                          foregroundColor: diffMin < 0 ? WazeColors.blue : const Color(0xFF37474F),
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                          minimumSize: const Size(0, 28),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          foregroundColor: WazeColors.blue,
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                          minimumSize: const Size(0, 26),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                         ),
-                        onPressed: () => c.selectRoute(otherIdx),
+                        onPressed: () {
+                          c.selectRoute(otherIdx);
+                          setState(() => _dismissedRouteSwitch = true);
+                        },
                         child: Text(
                           arabic ? 'تحويل' : 'Switch',
                           style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      // Prominent close / exit button
+                      InkWell(
+                        onTap: () {
+                          setState(() => _dismissedRouteSwitch = true);
+                        },
+                        borderRadius: BorderRadius.circular(12),
+                        child: const Padding(
+                          padding: EdgeInsets.all(4),
+                          child: Icon(Icons.close_rounded, color: Colors.white70, size: 18),
                         ),
                       ),
                     ],
@@ -1403,10 +1438,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               ),
             ),
 
-          // Floating Controls (Right Side)
+          // Floating Controls (Side)
           Positioned(
-            right: 16,
-            top: c.navigating ? 156 : 64,
+            right: isLandscape ? (arabic ? null : 12) : 16,
+            left: isLandscape ? (arabic ? 12 : null) : null,
+            top: isLandscape ? 8 : (c.navigating ? 156 : 64),
             child: Column(
               children: [
                 // Sound Toggle Button
@@ -1416,6 +1452,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       : Icons.volume_off_rounded,
                   color: c.voice ? WazeColors.blue : Colors.grey,
                   dark: dark,
+                  size: isLandscape ? 36 : 44,
                   tooltip: arabic ? 'نقر: تبديل الصوت • مطول: اختبار الصوت' : 'Tap: Toggle voice • Long press: Test voice',
                   onPressed: () {
                     if (!c.voice) {
@@ -1430,22 +1467,24 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   },
                   onLongPress: () => c.testVoice(),
                 ),
-                const SizedBox(height: 10),
+                SizedBox(height: isLandscape ? 5 : 10),
 
                 // 3D Perspective Driving View Button
                 _buildCircularButton(
                   icon: _is3D ? Icons.view_in_ar_rounded : Icons.layers_rounded,
                   color: _is3D ? WazeColors.cyan : (dark ? Colors.white60 : Colors.black54),
                   dark: dark,
+                  size: isLandscape ? 36 : 44,
                   onPressed: _toggle3D,
                 ),
-                const SizedBox(height: 10),
+                SizedBox(height: isLandscape ? 5 : 10),
 
                 // 3D Satellite Layer Toggle Button
                 _buildCircularButton(
                   icon: c.satellite ? Icons.satellite_alt_rounded : Icons.public_rounded,
                   color: c.satellite ? Colors.amber : (dark ? Colors.white60 : Colors.black54),
                   dark: dark,
+                  size: isLandscape ? 36 : 44,
                   onPressed: () {
                     c.setSatellite(!c.satellite);
                     if (c.satellite && !_is3D) {
@@ -1453,24 +1492,26 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     }
                   },
                 ),
-                const SizedBox(height: 10),
+                SizedBox(height: isLandscape ? 5 : 10),
 
                 // Zoom In
                 _buildCircularButton(
                   icon: Icons.add_rounded,
                   color: dark ? Colors.white70 : Colors.black87,
                   dark: dark,
+                  size: isLandscape ? 36 : 44,
                   onPressed: () {
                     _mapController?.animateCamera(CameraUpdate.zoomIn());
                   },
                 ),
-                const SizedBox(height: 6),
+                SizedBox(height: isLandscape ? 4 : 6),
 
                 // Zoom Out
                 _buildCircularButton(
                   icon: Icons.remove_rounded,
                   color: dark ? Colors.white70 : Colors.black87,
                   dark: dark,
+                  size: isLandscape ? 36 : 44,
                   onPressed: () {
                     _mapController?.animateCamera(CameraUpdate.zoomOut());
                   },
@@ -1479,53 +1520,100 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             ),
           ),
 
-          // Speedometer & Orange Report Button (Stacked vertically on Bottom Left)
+          // Speedometer & Orange Report Button
           Positioned(
-            left: 20,
-            bottom: c.navigating ? 150 : (_bottomPanelMinimized ? 76 : 205),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                // Iconic Waze Orange Report Button (Directly above Speedometer)
-                Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    onTap: _openReportSheet,
-                    borderRadius: BorderRadius.circular(32),
-                    child: Container(
-                      width: 58,
-                      height: 58,
-                      decoration: BoxDecoration(
-                        color: WazeColors.orange,
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: WazeColors.orange.withValues(alpha: 0.5),
-                            blurRadius: 12,
-                            offset: const Offset(0, 4),
+            left: isLandscape ? (arabic ? null : 14) : 20,
+            right: isLandscape ? (arabic ? 14 : null) : null,
+            bottom: isLandscape
+                ? 52
+                : (c.navigating ? 150 : (_bottomPanelMinimized ? 76 : 205)),
+            child: isLandscape
+                ? Row(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      // Iconic Waze Orange Report Button
+                      Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: _openReportSheet,
+                          borderRadius: BorderRadius.circular(22),
+                          child: Container(
+                            width: 44,
+                            height: 44,
+                            decoration: BoxDecoration(
+                              color: WazeColors.orange,
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: WazeColors.orange.withValues(alpha: 0.45),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: const Center(
+                              child: Icon(
+                                Icons.campaign_rounded,
+                                color: Colors.white,
+                                size: 22,
+                              ),
+                            ),
                           ),
-                        ],
-                      ),
-                      child: const Center(
-                        child: Icon(
-                          Icons.campaign_rounded,
-                          color: Colors.white,
-                          size: 30,
                         ),
                       ),
-                    ),
+                      const SizedBox(width: 8),
+                      // Speedometer
+                      WazeSpeedometer(
+                        speedKph: c.speedKph,
+                        miles: c.miles,
+                        dark: dark,
+                      ),
+                    ],
+                  )
+                : Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      // Iconic Waze Orange Report Button (Directly above Speedometer)
+                      Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: _openReportSheet,
+                          borderRadius: BorderRadius.circular(32),
+                          child: Container(
+                            width: 58,
+                            height: 58,
+                            decoration: BoxDecoration(
+                              color: WazeColors.orange,
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: WazeColors.orange.withValues(alpha: 0.5),
+                                  blurRadius: 12,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
+                            ),
+                            child: const Center(
+                              child: Icon(
+                                Icons.campaign_rounded,
+                                color: Colors.white,
+                                size: 30,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      // Speedometer
+                      WazeSpeedometer(
+                        speedKph: c.speedKph,
+                        miles: c.miles,
+                        dark: dark,
+                      ),
+                    ],
                   ),
-                ),
-                const SizedBox(height: 10),
-                // Speedometer
-                WazeSpeedometer(
-                  speedKph: c.speedKph,
-                  miles: c.miles,
-                  dark: dark,
-                ),
-              ],
-            ),
           ),
 
           // Floating Recenter Pill when map is panned away from location
@@ -1652,6 +1740,17 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   /// Build positioned car puck widget (anchored to user location on screen)
   Widget _buildPositionedCarPuck(AppController c) {
     if (_followUser || _puckScreenOffset == null) {
+      final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
+      if (isLandscape && c.navigating) {
+        final size = MediaQuery.of(context).size;
+        // In landscape navigation, place car puck centered in the clear viewing area
+        final startOffset = c.arabic ? -40.0 : 40.0;
+        return Positioned(
+          left: (size.width / 2 + startOffset) - 34,
+          top: (size.height / 2 + 10) - 34,
+          child: _buildCarPuck(c),
+        );
+      }
       return Center(
         child: _buildCarPuck(c),
       );
@@ -1728,10 +1827,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     required VoidCallback onPressed,
     VoidCallback? onLongPress,
     String? tooltip,
+    double size = 44,
   }) {
     return Container(
-      width: 44,
-      height: 44,
+      width: size,
+      height: size,
       decoration: BoxDecoration(
         color: dark ? WazeColors.darkSurface : Colors.white,
         shape: BoxShape.circle,
@@ -1742,11 +1842,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       child: Tooltip(
         message: tooltip ?? '',
         child: InkWell(
-          borderRadius: BorderRadius.circular(22),
+          borderRadius: BorderRadius.circular(size / 2),
           onTap: onPressed,
           onLongPress: onLongPress,
           child: Center(
-            child: Icon(icon, color: color, size: 22),
+            child: Icon(icon, color: color, size: size * 0.5),
           ),
         ),
       ),

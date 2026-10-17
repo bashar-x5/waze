@@ -1165,6 +1165,105 @@ class WazeBottomPanel extends StatelessWidget {
       remainingDelayMin = (remainingDelaySecs / 60).round();
     }
 
+    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
+
+    if (isLandscape) {
+      return Padding(
+        key: const ValueKey('nav_panel_landscape'),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        child: Row(
+          children: [
+            // Duration
+            Text(
+              c.duration(remainingSecs),
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w900,
+                color: WazeColors.green,
+                height: 1.0,
+              ),
+            ),
+            const SizedBox(width: 8),
+            // Distance
+            Text(
+              c.distance(remainingMeters),
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: dark ? Colors.white70 : Colors.black87,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Container(
+              width: 1,
+              height: 14,
+              color: dark ? Colors.white24 : Colors.black12,
+            ),
+            const SizedBox(width: 10),
+            // ETA
+            Text(
+              '${arabic ? 'الوصول:' : 'ETA:'} $etaString',
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w600,
+                color: dark ? Colors.white60 : Colors.black54,
+              ),
+            ),
+            if (remainingDelayMin >= 1) ...[
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: WazeColors.red.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.traffic_rounded, size: 12, color: WazeColors.red),
+                    const SizedBox(width: 3),
+                    Text(
+                      '+$remainingDelayMin د',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: WazeColors.red,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+            const Spacer(),
+            // End Navigation Compact Button
+            FilledButton.icon(
+              onPressed: () => c.stopNavigation(),
+              icon: const Icon(Icons.close_rounded, size: 16),
+              label: Text(
+                arabic ? 'إنهاء' : 'End',
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              style: FilledButton.styleFrom(
+                backgroundColor: WazeColors.red,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 6,
+                ),
+                minimumSize: const Size(0, 32),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     return Padding(
       key: const ValueKey('nav_panel'),
       padding: const EdgeInsets.fromLTRB(20, 14, 20, 18),
