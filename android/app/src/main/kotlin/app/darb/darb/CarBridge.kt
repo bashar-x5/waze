@@ -29,7 +29,20 @@ data class CarNavState(
     val destName: String = "",
     val destLat: Double = 0.0,
     val destLon: Double = 0.0,
-    val routePoints: List<CarRoutePoint> = emptyList()
+    val routePoints: List<CarRoutePoint> = emptyList(),
+    val arabic: Boolean = true,
+    val dark: Boolean = true,
+    val satellite: Boolean = false,
+    val hasTraffic: Boolean = false,
+    val trafficDelayMin: Int = 0,
+    val homeTitle: String = "",
+    val homeLat: Double = 0.0,
+    val homeLon: Double = 0.0,
+    val workTitle: String = "",
+    val workLat: Double = 0.0,
+    val workLon: Double = 0.0,
+    val parkedLat: Double = 0.0,
+    val parkedLon: Double = 0.0
 )
 
 data class CarSavedPlace(
@@ -143,6 +156,20 @@ object CarBridge : MethodChannel.MethodCallHandler {
                     }
                 }
 
+                val arabic = args?.get("arabic") as? Boolean ?: true
+                val dark = args?.get("dark") as? Boolean ?: true
+                val satellite = args?.get("satellite") as? Boolean ?: false
+                val hasTraffic = args?.get("hasTraffic") as? Boolean ?: false
+                val trafficDelayMin = (args?.get("trafficDelayMin") as? Number)?.toInt() ?: 0
+                val homeTitle = args?.get("homeTitle") as? String ?: ""
+                val homeLat = (args?.get("homeLat") as? Number)?.toDouble() ?: 0.0
+                val homeLon = (args?.get("homeLon") as? Number)?.toDouble() ?: 0.0
+                val workTitle = args?.get("workTitle") as? String ?: ""
+                val workLat = (args?.get("workLat") as? Number)?.toDouble() ?: 0.0
+                val workLon = (args?.get("workLon") as? Number)?.toDouble() ?: 0.0
+                val parkedLat = (args?.get("parkedLat") as? Number)?.toDouble() ?: 0.0
+                val parkedLon = (args?.get("parkedLon") as? Number)?.toDouble() ?: 0.0
+
                 currentState = CarNavState(
                     isNavigating = isNavigating,
                     instruction = instruction,
@@ -161,7 +188,20 @@ object CarBridge : MethodChannel.MethodCallHandler {
                     destName = destName,
                     destLat = destLat,
                     destLon = destLon,
-                    routePoints = routePointsList
+                    routePoints = routePointsList,
+                    arabic = arabic,
+                    dark = dark,
+                    satellite = satellite,
+                    hasTraffic = hasTraffic,
+                    trafficDelayMin = trafficDelayMin,
+                    homeTitle = homeTitle,
+                    homeLat = homeLat,
+                    homeLon = homeLon,
+                    workTitle = workTitle,
+                    workLat = workLat,
+                    workLon = workLon,
+                    parkedLat = parkedLat,
+                    parkedLon = parkedLon
                 )
 
                 mainHandler.post {

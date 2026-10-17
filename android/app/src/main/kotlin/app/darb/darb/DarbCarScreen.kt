@@ -5,7 +5,6 @@ import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.Rect
-import android.graphics.RectF
 import android.view.Surface
 import androidx.car.app.AppManager
 import androidx.car.app.CarContext
@@ -15,9 +14,6 @@ import androidx.car.app.SurfaceContainer
 import androidx.car.app.model.Action
 import androidx.car.app.model.ActionStrip
 import androidx.car.app.model.Distance
-import androidx.car.app.model.ItemList
-import androidx.car.app.model.ListTemplate
-import androidx.car.app.model.Row
 import androidx.car.app.model.Template
 import androidx.car.app.navigation.NavigationManager
 import androidx.car.app.navigation.NavigationManagerCallback
@@ -30,8 +26,6 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import java.time.ZonedDateTime
 import java.util.concurrent.Executors
-import kotlin.math.cos
-import kotlin.math.sin
 
 class DarbCarScreen(carContext: CarContext) : Screen(carContext),
     CarBridge.StateListener, SurfaceCallback {
@@ -48,6 +42,7 @@ class DarbCarScreen(carContext: CarContext) : Screen(carContext),
         null
     }
 
+    private val tileManager = CarTileManager(carContext)
     private var isNavigatingRegistered = false
 
     @Volatile
@@ -83,6 +78,7 @@ class DarbCarScreen(carContext: CarContext) : Screen(carContext),
                     navManager?.clearNavigationManagerCallback()
                 } catch (_: Exception) {}
                 currentSurface = null
+                tileManager.clear()
                 renderExecutor.shutdown()
             }
         })
@@ -146,7 +142,7 @@ class DarbCarScreen(carContext: CarContext) : Screen(carContext),
     }
 
     // ---------------------------------------------------------
-    // Template Construction
+    // Template Construction (CarPlay & Android Auto Standard)
     // ---------------------------------------------------------
 
     override fun onGetTemplate(): Template {
@@ -154,21 +150,21 @@ class DarbCarScreen(carContext: CarContext) : Screen(carContext),
         return if (state.isNavigating) {
             buildNavigatingTemplate(state)
         } else {
-            buildIdleTemplate()
+            buildIdleTemplate(state)
         }
     }
 
     private fun buildNavigatingTemplate(state: CarNavState): Template {
         try {
             val voiceAction = Action.Builder()
-                .setTitle("صوتي / Voice")
+                .setTitle(if (state.arabic) "🎤 بحث صوتي" else "🎤 Voice")
                 .setOnClickListener {
                     screenManager.push(DarbCarSearchScreen(carContext))
                 }
                 .build()
 
             val stopAction = Action.Builder()
-                .setTitle("إنهاء / Stop")
+                .setTitle(if (state.arabic) "🛑 إنهاء" else "🛑 End")
                 .setOnClickListener {
                     CarBridge.notifyStopNavigation()
                 }
@@ -195,7 +191,7 @@ class DarbCarScreen(carContext: CarContext) : Screen(carContext),
 
             val step = Step.Builder()
                 .setManeuver(maneuver)
-                .setRoad(state.roadName.ifBlank { "طريق الرحلة" })
+                .setRoad(state.roadName.ifBlank { state.instruction.ifBlank { "طريق الرحلة" } })
                 .build()
 
             val distKm = if (state.stepDistanceMeters > 0) {
@@ -228,76 +224,80 @@ class DarbCarScreen(carContext: CarContext) : Screen(carContext),
 
             return navBuilder.build()
         } catch (_: Exception) {
-            return buildIdleTemplate()
+            return buildIdleTemplate(state)
         }
     }
 
-    private fun buildIdleTemplate(): Template {
+    private fun buildIdleTemplate(state: CarNavState): Template {
         try {
-            val voiceAction = Action.Builder()
-                .setTitle("🎤 بحث صوتي / Voice")
-                .setOnClickListener {
-                    screenManager.push(DarbCarSearchScreen(carContext))
-                }
-                .build()
+            val actions = ActionStrip.Builder()
 
-            val savedAction = Action.Builder()
-                .setTitle("⭐ المحفوظة / Saved")
-                .setOnClickListener {
-                    screenManager.push(DarbCarSavedPlacesScreen(carContext))
-                }
-                .build()
-
-            val refreshAction = Action.Builder()
-                .setTitle("🔄 تمركز / Center")
-                .setOnClickListener {
-                    renderSurface()
-                    invalidate()
-                }
-                .build()
-
-            val actionStrip = ActionStrip.Builder()
-                .addAction(voiceAction)
-                .addAction(savedAction)
-                .addAction(refreshAction)
-                .build()
-
-            return NavigationTemplate.Builder()
-                .setActionStrip(actionStrip)
-                .build()
-        } catch (_: Exception) {
-            // Graceful fallback to ListTemplate if host enforces it
-            val listBuilder = ItemList.Builder()
-            listBuilder.addItem(
-                Row.Builder()
-                    .setTitle("🎤 بحث صوتي / Voice Navigation")
-                    .addText("قل: 'اريد الذهاب لساحة الفردوس'")
+            // 1. Voice Search Action
+            actions.addAction(
+                Action.Builder()
+                    .setTitle(if (state.arabic) "🎤 بحث صوتي" else "🎤 Voice Search")
                     .setOnClickListener {
                         screenManager.push(DarbCarSearchScreen(carContext))
                     }
                     .build()
             )
-            for (p in CarBridge.savedPlaces.take(4)) {
-                listBuilder.addItem(
-                    Row.Builder()
-                        .setTitle(p.title)
-                        .addText(p.subtitle)
+
+            // 2. Home Quick Action (if available)
+            if (state.homeLat != 0.0 && state.homeLon != 0.0) {
+                actions.addAction(
+                    Action.Builder()
+                        .setTitle(if (state.arabic) "🏠 المنزل" else "🏠 Home")
                         .setOnClickListener {
-                            CarBridge.notifyDestinationSelected(p.id, p.lat, p.lon)
+                            CarBridge.notifyDestinationSelected("home", state.homeLat, state.homeLon)
                         }
                         .build()
                 )
             }
-            return ListTemplate.Builder()
-                .setTitle("درب - Darb")
-                .setHeaderAction(Action.APP_ICON)
-                .setSingleList(listBuilder.build())
+
+            // 3. Work Quick Action (if available)
+            if (state.workLat != 0.0 && state.workLon != 0.0) {
+                actions.addAction(
+                    Action.Builder()
+                        .setTitle(if (state.arabic) "💼 العمل" else "💼 Work")
+                        .setOnClickListener {
+                            CarBridge.notifyDestinationSelected("work", state.workLat, state.workLon)
+                        }
+                        .build()
+                )
+            }
+
+            // 4. Parked Car Action (if saved)
+            if (state.parkedLat != 0.0 && state.parkedLon != 0.0) {
+                actions.addAction(
+                    Action.Builder()
+                        .setTitle(if (state.arabic) "🅿️ سيارتي" else "🅿️ Parked Car")
+                        .setOnClickListener {
+                            CarBridge.notifyDestinationSelected("parked-car", state.parkedLat, state.parkedLon)
+                        }
+                        .build()
+                )
+            }
+
+            // 5. Saved Places
+            actions.addAction(
+                Action.Builder()
+                    .setTitle(if (state.arabic) "⭐ المفضلة" else "⭐ Saved")
+                    .setOnClickListener {
+                        screenManager.push(DarbCarSavedPlacesScreen(carContext))
+                    }
+                    .build()
+            )
+
+            return NavigationTemplate.Builder()
+                .setActionStrip(actions.build())
                 .build()
+        } catch (_: Exception) {
+            return NavigationTemplate.Builder().build()
         }
     }
 
     // ---------------------------------------------------------
-    // High-Performance Map Surface Canvas Renderer
+    // High-Performance Map Surface Canvas Renderer (Matching Phone)
     // ---------------------------------------------------------
 
     private fun renderSurface() {
@@ -327,142 +327,120 @@ class DarbCarScreen(carContext: CarContext) : Screen(carContext),
         val w = canvas.width.toFloat().coerceAtLeast(640f)
         val h = canvas.height.toFloat().coerceAtLeast(400f)
         val state = CarBridge.currentState
+        val dark = state.dark
+        val isSatellite = state.satellite
 
-        // 1. Deep Midnight Slate Canvas Background
-        canvas.drawColor(Color.parseColor("#090E17"))
+        // 1. Canvas Base Background
+        val bgColor = if (isSatellite) {
+            Color.parseColor("#06090E")
+        } else if (dark) {
+            Color.parseColor("#0F1722")
+        } else {
+            Color.parseColor("#E8EEF3")
+        }
+        canvas.drawColor(bgColor)
 
-        // 2. City Blocks & Baghdad Urban Texture
-        val blockPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.parseColor("#0F1726")
-            style = Paint.Style.FILL
-        }
-        val blockBorder = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.parseColor("#152238")
-            style = Paint.Style.STROKE
-            strokeWidth = 2f
-        }
+        // 2. Web Mercator Projection Setup (Zoom 16 for rich urban street details)
+        val zoom = 16
+        val worldSize = (1 shl zoom) * 256.0
+        val latClamped = state.lat.coerceIn(-85.05112878, 85.05112878)
+        val worldX = ((state.lon + 180.0) / 360.0) * worldSize
+        val latRad = Math.toRadians(latClamped)
+        val worldY = ((1.0 - Math.log(Math.tan(latRad) + 1.0 / Math.cos(latRad)) / Math.PI) / 2.0) * worldSize
 
-        val blockSize = 140f
-        var bx = 10f
-        while (bx < w) {
-            var by = 10f
-            while (by < h) {
-                val rect = RectF(bx, by, bx + blockSize - 20f, by + blockSize - 20f)
-                canvas.drawRoundRect(rect, 12f, 12f, blockPaint)
-                canvas.drawRoundRect(rect, 12f, 12f, blockBorder)
-                by += blockSize
-            }
-            bx += blockSize
-        }
-
-        // 3. Tigris River Curve Across Baghdad
-        val riverPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.parseColor("#0C2C3D")
-            style = Paint.Style.STROKE
-            strokeWidth = 55f
-            strokeCap = Paint.Cap.ROUND
-            strokeJoin = Paint.Join.ROUND
-        }
-        val riverPath = Path().apply {
-            moveTo(w * 0.15f, -20f)
-            cubicTo(w * 0.35f, h * 0.3f, w * 0.25f, h * 0.65f, w * 0.45f, h + 30f)
-        }
-        canvas.drawPath(riverPath, riverPaint)
-
-        // 4. Major Baghdad Expressways & Arterials
-        val roadOutlinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.parseColor("#1D2D45")
-            style = Paint.Style.STROKE
-            strokeWidth = 22f
-            strokeCap = Paint.Cap.ROUND
-            strokeJoin = Paint.Join.ROUND
-        }
-        val roadSurfacePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.parseColor("#263B59")
-            style = Paint.Style.STROKE
-            strokeWidth = 14f
-            strokeCap = Paint.Cap.ROUND
-            strokeJoin = Paint.Join.ROUND
-        }
-
-        // Arterial corridor 1: Mohammed Al-Qassim Expressway
-        val expresswayPath = Path().apply {
-            moveTo(-20f, h * 0.35f)
-            lineTo(w * 0.5f, h * 0.42f)
-            lineTo(w + 30f, h * 0.48f)
-        }
-        canvas.drawPath(expresswayPath, roadOutlinePaint)
-        canvas.drawPath(expresswayPath, roadSurfacePaint)
-
-        // Arterial corridor 2: 14th of July / Airport Highway
-        val highwayPath = Path().apply {
-            moveTo(w * 0.52f, -20f)
-            lineTo(w * 0.48f, h + 30f)
-        }
-        canvas.drawPath(highwayPath, roadOutlinePaint)
-        canvas.drawPath(highwayPath, roadSurfacePaint)
-
-        // 5. Vehicle Position & Projection
         val carX = w * 0.5f
-        val carY = if (state.isNavigating) h * 0.65f else h * 0.5f
-        val headingRad = Math.toRadians(-state.heading.toDouble())
-        val cosH = cos(headingRad)
-        val sinH = sin(headingRad)
+        val carY = if (state.isNavigating) h * 0.62f else h * 0.5f
 
-        // 6. Active Navigation Route Polyline
+        canvas.save()
+        canvas.translate(carX, carY)
         if (state.isNavigating) {
+            canvas.rotate(-state.heading)
+        }
+
+        // 3. Render Real Vector/Raster Map Tiles
+        val radius = Math.hypot(w.toDouble(), h.toDouble()).toFloat() * 0.65f
+        val minWorldX = worldX - radius
+        val maxWorldX = worldX + radius
+        val minWorldY = worldY - radius
+        val maxWorldY = worldY + radius
+
+        val minTileX = (minWorldX / 256.0).toInt().coerceAtLeast(0)
+        val maxTileX = (maxWorldX / 256.0).toInt().coerceAtMost((1 shl zoom) - 1)
+        val minTileY = (minWorldY / 256.0).toInt().coerceAtLeast(0)
+        val maxTileY = (maxWorldY / 256.0).toInt().coerceAtMost((1 shl zoom) - 1)
+
+        val placeholderPaint = Paint().apply {
+            color = if (dark) Color.parseColor("#152238") else Color.parseColor("#D5DEE5")
+            style = Paint.Style.STROKE
+            strokeWidth = 1f
+        }
+
+        for (tx in minTileX..maxTileX) {
+            for (ty in minTileY..maxTileY) {
+                val tileBmp = tileManager.getTile(zoom, tx, ty, isSatellite, dark) {
+                    renderSurface()
+                }
+                val drawX = (tx * 256.0 - worldX).toFloat()
+                val drawY = (ty * 256.0 - worldY).toFloat()
+
+                if (tileBmp != null && !tileBmp.isRecycled) {
+                    canvas.drawBitmap(tileBmp, drawX, drawY, null)
+                } else {
+                    canvas.drawRect(drawX, drawY, drawX + 256f, drawY + 256f, placeholderPaint)
+                }
+            }
+        }
+
+        // 4. Render Active Route Polyline Along Real Streets
+        if (state.isNavigating && state.routePoints.isNotEmpty()) {
             val routeGlow = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = Color.parseColor("#3500D2FF")
+                color = if (state.hasTraffic && state.trafficDelayMin > 3) {
+                    Color.parseColor("#55EF4444")
+                } else if (state.hasTraffic) {
+                    Color.parseColor("#55F59E0B")
+                } else {
+                    Color.parseColor("#4400D2FF")
+                }
                 style = Paint.Style.STROKE
-                strokeWidth = 28f
+                strokeWidth = 26f
                 strokeCap = Paint.Cap.ROUND
                 strokeJoin = Paint.Join.ROUND
             }
             val routeMain = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = Color.parseColor("#00D2FF")
+                color = if (state.hasTraffic && state.trafficDelayMin > 3) {
+                    Color.parseColor("#EF4444") // Heavy traffic
+                } else if (state.hasTraffic) {
+                    Color.parseColor("#F59E0B") // Moderate traffic
+                } else {
+                    Color.parseColor("#00D2FF") // Fast flow / Darb Cyan
+                }
                 style = Paint.Style.STROKE
-                strokeWidth = 14f
+                strokeWidth = 13f
                 strokeCap = Paint.Cap.ROUND
                 strokeJoin = Paint.Join.ROUND
             }
             val routeCore = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = Color.parseColor("#E0F7FA")
+                color = Color.WHITE
                 style = Paint.Style.STROKE
-                strokeWidth = 4f
+                strokeWidth = 3f
                 strokeCap = Paint.Cap.ROUND
                 strokeJoin = Paint.Join.ROUND
             }
 
             val routePath = Path()
+            var hasFirst = false
 
-            if (state.routePoints.isNotEmpty()) {
-                val metersPerPx = 1.6
-                var hasFirst = false
-                for (pt in state.routePoints) {
-                    val dLatMeters = (pt.lat - state.lat) * 111320.0
-                    val dLonMeters = (pt.lon - state.lon) * (111320.0 * cos(Math.toRadians(state.lat)))
-                    val rx = (dLonMeters * cosH - dLatMeters * sinH) / metersPerPx
-                    val ry = (dLonMeters * sinH + dLatMeters * cosH) / metersPerPx
-                    val sx = (carX + rx).toFloat()
-                    val sy = (carY - ry).toFloat()
+            for (pt in state.routePoints) {
+                val ptLatClamped = pt.lat.coerceIn(-85.05112878, 85.05112878)
+                val ptWorldX = ((pt.lon + 180.0) / 360.0) * worldSize - worldX
+                val ptLatRad = Math.toRadians(ptLatClamped)
+                val ptWorldY = ((1.0 - Math.log(Math.tan(ptLatRad) + 1.0 / Math.cos(ptLatRad)) / Math.PI) / 2.0) * worldSize - worldY
 
-                    if (!hasFirst) {
-                        routePath.moveTo(sx, sy)
-                        hasFirst = true
-                    } else {
-                        routePath.lineTo(sx, sy)
-                    }
-                }
-            } else {
-                // Dynamic projected route curve based on current maneuver
-                routePath.moveTo(carX, carY)
-                when (state.maneuverType) {
-                    2 -> routePath.cubicTo(carX, carY - 80f, carX - 60f, carY - 180f, carX - 120f, carY - 260f)
-                    3, 4 -> routePath.cubicTo(carX, carY - 60f, carX - 80f, carY - 120f, carX - 220f, carY - 130f)
-                    5 -> routePath.cubicTo(carX, carY - 80f, carX + 60f, carY - 180f, carX + 120f, carY - 260f)
-                    6, 7 -> routePath.cubicTo(carX, carY - 60f, carX + 80f, carY - 120f, carX + 220f, carY - 130f)
-                    8 -> routePath.cubicTo(carX, carY - 80f, carX - 120f, carY - 80f, carX - 120f, carY + 100f)
-                    else -> routePath.lineTo(carX, carY - 320f)
+                if (!hasFirst) {
+                    routePath.moveTo(ptWorldX.toFloat(), ptWorldY.toFloat())
+                    hasFirst = true
+                } else {
+                    routePath.lineTo(ptWorldX.toFloat(), ptWorldY.toFloat())
                 }
             }
 
@@ -471,163 +449,178 @@ class DarbCarScreen(carContext: CarContext) : Screen(carContext),
             canvas.drawPath(routePath, routeCore)
 
             // Destination Marker Pin
-            if (state.destName.isNotBlank()) {
-                val pinX = carX
-                val pinY = carY - 280f
-                val pinPulse = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    color = Color.parseColor("#4DF43F5E")
-                    style = Paint.Style.FILL
-                }
-                val pinCore = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    color = Color.parseColor("#F43F5E")
-                    style = Paint.Style.FILL
-                }
-                canvas.drawCircle(pinX, pinY, 20f, pinPulse)
-                canvas.drawCircle(pinX, pinY, 10f, pinCore)
+            if (state.destLat != 0.0 && state.destLon != 0.0) {
+                val destLatClamped = state.destLat.coerceIn(-85.05112878, 85.05112878)
+                val destWorldX = (((state.destLon + 180.0) / 360.0) * worldSize - worldX).toFloat()
+                val destLatRad = Math.toRadians(destLatClamped)
+                val destWorldY = (((1.0 - Math.log(Math.tan(destLatRad) + 1.0 / Math.cos(destLatRad)) / Math.PI) / 2.0) * worldSize - worldY).toFloat()
 
-                val tagPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    color = Color.parseColor("#E60F172A")
+                val pinShadow = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = Color.parseColor("#50000000")
                     style = Paint.Style.FILL
                 }
-                val tagText = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    color = Color.WHITE
-                    textSize = 18f
-                    textAlign = Paint.Align.CENTER
-                    isFakeBoldText = true
+                val pinPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = Color.parseColor("#EF4444")
+                    style = Paint.Style.FILL
                 }
-                val tagRect = RectF(pinX - 110f, pinY - 50f, pinX + 110f, pinY - 14f)
-                canvas.drawRoundRect(tagRect, 8f, 8f, tagPaint)
-                canvas.drawText(state.destName.take(18), pinX, pinY - 24f, tagText)
+                val pinBorder = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = Color.WHITE
+                    style = Paint.Style.STROKE
+                    strokeWidth = 4f
+                }
+                canvas.drawCircle(destWorldX, destWorldY + 3f, 20f, pinShadow)
+                canvas.drawCircle(destWorldX, destWorldY, 18f, pinPaint)
+                canvas.drawCircle(destWorldX, destWorldY, 18f, pinBorder)
+
+                // White inner dot
+                val pinDot = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = Color.WHITE
+                    style = Paint.Style.FILL
+                }
+                canvas.drawCircle(destWorldX, destWorldY, 6f, pinDot)
             }
         }
 
-        // 7. 3D Aerodynamic Vehicle Navigation Puck (Chevron)
-        val shadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.parseColor("#66000000")
-            style = Paint.Style.FILL
-        }
-        canvas.drawCircle(carX, carY + 4f, 24f, shadowPaint)
+        // Restore canvas from world coordinates to screen pixel coordinates
+        canvas.restore()
 
-        val haloPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.parseColor("#3300E5FF")
-            style = Paint.Style.FILL
-        }
-        canvas.drawCircle(carX, carY, 32f, haloPaint)
-
-        canvas.save()
-        // If navigating, forward is straight up (0 degrees); if idle, point according to heading
+        // -------------------------------------------------------------
+        // 5. Draw Car Puck (Chevron matching Phone exactly)
+        // -------------------------------------------------------------
         val puckAngle = if (state.isNavigating) 0f else state.heading
-        canvas.rotate(puckAngle, carX, carY)
 
-        val leftWing = Path().apply {
-            moveTo(carX, carY - 22f)
-            lineTo(carX - 16f, carY + 16f)
-            lineTo(carX, carY + 8f)
-            close()
-        }
-        val leftPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.parseColor("#38BDF8")
+        // Pulse Halo Ring
+        val haloPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#3500D2FF")
             style = Paint.Style.FILL
         }
-        canvas.drawPath(leftWing, leftPaint)
+        canvas.drawCircle(carX, carY, 36f, haloPaint)
 
-        val rightWing = Path().apply {
-            moveTo(carX, carY - 22f)
-            lineTo(carX + 16f, carY + 16f)
-            lineTo(carX, carY + 8f)
-            close()
-        }
-        val rightPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.parseColor("#0284C7")
+        // Shadow
+        val puckShadow = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#45000000")
             style = Paint.Style.FILL
         }
-        canvas.drawPath(rightWing, rightPaint)
+        canvas.drawCircle(carX, carY + 3f, 22f, puckShadow)
 
-        val spinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        // White base circle
+        val puckBase = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.WHITE
-            style = Paint.Style.STROKE
-            strokeWidth = 2.5f
-            strokeCap = Paint.Cap.ROUND
-        }
-        canvas.drawLine(carX, carY - 22f, carX, carY + 8f, spinePaint)
-        canvas.restore()
-
-        // 8. Top-Right HUD: Digital Speedometer
-        val speedBox = RectF(w - 150f, 20f, w - 24f, 95f)
-        val hudBg = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.parseColor("#D90A101D")
             style = Paint.Style.FILL
         }
-        val hudBorder = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.parseColor("#22334F")
-            style = Paint.Style.STROKE
-            strokeWidth = 2f
-        }
-        canvas.drawRoundRect(speedBox, 16f, 16f, hudBg)
-        canvas.drawRoundRect(speedBox, 16f, 16f, hudBorder)
+        canvas.drawCircle(carX, carY, 20f, puckBase)
 
-        val speedNum = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.WHITE
-            textSize = 34f
-            textAlign = Paint.Align.CENTER
-            isFakeBoldText = true
-        }
-        val speedUnit = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.parseColor("#38BDF8")
-            textSize = 12f
-            textAlign = Paint.Align.CENTER
-            isFakeBoldText = true
-        }
-        canvas.drawText("${state.speedKmh}", speedBox.centerX(), speedBox.top + 42f, speedNum)
-        canvas.drawText("كم/س • KM/H", speedBox.centerX(), speedBox.top + 64f, speedUnit)
-
-        // 9. Bottom-Right HUD: Live Darb Navigation Status Badge
-        val statusX = w - 170f
-        val statusY = h - 28f
-        val statusDot = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.parseColor("#10B981")
+        // Cyan inner circle
+        val puckInner = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#00D2FF")
             style = Paint.Style.FILL
         }
-        canvas.drawCircle(statusX - 12f, statusY - 5f, 6f, statusDot)
+        canvas.drawCircle(carX, carY, 16f, puckInner)
 
-        val statusText = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.parseColor("#E2E8F0")
-            textSize = 14f
-            isFakeBoldText = true
-        }
-        canvas.drawText(if (state.isNavigating) "درب • ملاحة نشطة" else "درب • متصل ومستعد", statusX, statusY, statusText)
-
-        // 10. Top-Left HUD: Compass Rose Dial
-        val compassX = 54f
-        val compassY = 56f
-        canvas.drawCircle(compassX, compassY, 26f, hudBg)
-        canvas.drawCircle(compassX, compassY, 26f, hudBorder)
-
+        // Navigation Chevron Triangle pointing in heading direction
         canvas.save()
-        canvas.rotate(-state.heading, compassX, compassY)
-        val northNeedle = Path().apply {
-            moveTo(compassX, compassY - 18f)
-            lineTo(compassX - 5f, compassY)
-            lineTo(compassX + 5f, compassY)
+        canvas.rotate(puckAngle, carX, carY)
+        val chevronPath = Path().apply {
+            moveTo(carX, carY - 10f)
+            lineTo(carX - 7f, carY + 7f)
+            lineTo(carX, carY + 3f)
+            lineTo(carX + 7f, carY + 7f)
             close()
         }
-        val northPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.parseColor("#EF4444")
+        val chevronPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.WHITE
             style = Paint.Style.FILL
         }
-        canvas.drawPath(northNeedle, northPaint)
-
-        val southNeedle = Path().apply {
-            moveTo(compassX, compassY + 18f)
-            lineTo(compassX - 5f, compassY)
-            lineTo(compassX + 5f, compassY)
-            close()
-        }
-        val southPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.parseColor("#94A3B8")
-            style = Paint.Style.FILL
-        }
-        canvas.drawPath(southNeedle, southPaint)
+        canvas.drawPath(chevronPath, chevronPaint)
         canvas.restore()
+
+        // -------------------------------------------------------------
+        // 6. UI Overlays (Matching Phone Landscape Layout)
+        // -------------------------------------------------------------
+
+        // Speedometer (Waze Circular Glass Badge)
+        val spCenter = w - 62f
+        val spY = h - 62f
+        val spRadius = 38f
+
+        val spBg = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#E60F172A")
+            style = Paint.Style.FILL
+        }
+        val spRing = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#00D2FF")
+            style = Paint.Style.STROKE
+            strokeWidth = 3f
+        }
+        canvas.drawCircle(spCenter, spY, spRadius, spBg)
+        canvas.drawCircle(spCenter, spY, spRadius, spRing)
+
+        val spNumText = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.WHITE
+            textSize = 28f
+            textAlign = Paint.Align.CENTER
+            isFakeBoldText = true
+        }
+        val spUnitText = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#38BDF8")
+            textSize = 10f
+            textAlign = Paint.Align.CENTER
+            isFakeBoldText = true
+        }
+        canvas.drawText("${state.speedKmh}", spCenter, spY + 4f, spNumText)
+        canvas.drawText(if (state.arabic) "كم/س" else "km/h", spCenter, spY + 20f, spUnitText)
+
+        // Orange Report Button
+        val repCenter = w - 148f
+        val repY = h - 62f
+        val repRadius = 26f
+        val repBg = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#FF6D00")
+            style = Paint.Style.FILL
+        }
+        val repShadow = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#40000000")
+            style = Paint.Style.FILL
+        }
+        canvas.drawCircle(repCenter, repY + 2f, repRadius, repShadow)
+        canvas.drawCircle(repCenter, repY, repRadius, repBg)
+        val repIconText = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.WHITE
+            textSize = 22f
+            textAlign = Paint.Align.CENTER
+        }
+        canvas.drawText("📢", repCenter, repY + 8f, repIconText)
+
+        // App Status Branding Badge (Top Right)
+        val brandBox = android.graphics.RectF(w - 170f, 16f, w - 16f, 52f)
+        val brandBg = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#D90F172A")
+            style = Paint.Style.FILL
+        }
+        val brandBorder = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#00D2FF")
+            style = Paint.Style.STROKE
+            strokeWidth = 1.5f
+        }
+        canvas.drawRoundRect(brandBox, 12f, 12f, brandBg)
+        canvas.drawRoundRect(brandBox, 12f, 12f, brandBorder)
+
+        val brandDot = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#00E676")
+            style = Paint.Style.FILL
+        }
+        canvas.drawCircle(brandBox.left + 16f, brandBox.centerY(), 5f, brandDot)
+
+        val brandText = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.WHITE
+            textSize = 13f
+            isFakeBoldText = true
+        }
+        val brandLabel = if (state.isNavigating) {
+            if (state.arabic) "درب • ملاحة مباشرة" else "Darb • Navigating"
+        } else {
+            if (state.arabic) "درب • متصل بالسيارة" else "Darb • Connected"
+        }
+        canvas.drawText(brandLabel, brandBox.left + 30f, brandBox.centerY() + 5f, brandText)
     }
 }

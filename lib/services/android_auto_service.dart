@@ -226,6 +226,9 @@ class AndroidAutoService {
     final heading = controller.heading;
     final pos = controller.position;
     final dest = controller.destination;
+    final home = _getHome();
+    final work = _getWork();
+    final parked = controller.parkedLocation;
 
     try {
       _channel.invokeMethod('updateNavState', {
@@ -247,6 +250,19 @@ class AndroidAutoService {
         'destLat': dest?.point.latitude ?? 0.0,
         'destLon': dest?.point.longitude ?? 0.0,
         'routePoints': routePoints,
+        'arabic': arabic,
+        'dark': controller.dark,
+        'satellite': controller.satellite,
+        'hasTraffic': r?.hasTraffic ?? false,
+        'trafficDelayMin': ((r?.trafficDelaySeconds ?? 0) / 60).round(),
+        'homeTitle': home?.label(arabic) ?? '',
+        'homeLat': home?.point.latitude ?? 0.0,
+        'homeLon': home?.point.longitude ?? 0.0,
+        'workTitle': work?.label(arabic) ?? '',
+        'workLat': work?.point.latitude ?? 0.0,
+        'workLon': work?.point.longitude ?? 0.0,
+        'parkedLat': parked?.point.latitude ?? 0.0,
+        'parkedLon': parked?.point.longitude ?? 0.0,
       });
     } catch (_) {}
   }
