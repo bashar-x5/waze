@@ -15,9 +15,16 @@ class CarTileManager(private val context: Context) {
         override fun sizeOf(key: String, bitmap: Bitmap): Int = 1
     }
 
-    private val diskCacheDir = File(context.cacheDir, "darb_car_tiles").apply { mkdirs() }
+    private val diskCacheDir = File(context.cacheDir, "darb_car_tiles_v2").apply { mkdirs() }
     private val fetchExecutor = Executors.newFixedThreadPool(4)
     private val pendingRequests = mutableSetOf<String>()
+
+    init {
+        // Purge old watermarked CartoDB tiles if present
+        try {
+            File(context.cacheDir, "darb_car_tiles").deleteRecursively()
+        } catch (_: Exception) {}
+    }
 
     fun getTile(
         zoom: Int,
@@ -27,8 +34,8 @@ class CarTileManager(private val context: Context) {
         isDark: Boolean,
         onTileLoaded: () -> Unit
     ): Bitmap? {
-        val theme = if (isSatellite) "sat" else if (isDark) "dark" else "voyager"
-        val key = "$zoom/$x/$y/$theme"
+        val type = if (isSatellite) "sat" else "osm"
+        val key = "$zoom/$x/$y/$type"
 
         // 1. Check memory cache
         synchronized(memoryCache) {
@@ -37,7 +44,7 @@ class CarTileManager(private val context: Context) {
         }
 
         // 2. Check disk cache
-        val diskFile = File(diskCacheDir, "${zoom}_${x}_${y}_$theme.png")
+        val diskFile = File(diskCacheDir, "${type}_${zoom}_${x}_$y.png")
         if (diskFile.exists() && diskFile.length() > 0) {
             try {
                 val diskBmp = BitmapFactory.decodeFile(diskFile.absolutePath)
@@ -59,18 +66,17 @@ class CarTileManager(private val context: Context) {
         // 4. Download tile in background thread
         fetchExecutor.execute {
             try {
+                // 100% Free, zero-API-key, zero-watermark official tile sources
                 val urlStr = if (isSatellite) {
                     "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/$zoom/$y/$x"
-                } else if (isDark) {
-                    "https://a.basemaps.cartocdn.com/rastertiles/dark_all/$zoom/$x/$y.png"
                 } else {
-                    "https://a.basemaps.cartocdn.com/rastertiles/voyager/$zoom/$x/$y.png"
+                    "https://tile.openstreetmap.org/$zoom/$x/$y.png"
                 }
 
                 val conn = (URL(urlStr).openConnection() as HttpURLConnection).apply {
                     connectTimeout = 4000
                     readTimeout = 4000
-                    setRequestProperty("User-Agent", "DarbNavigation/1.0 (Android Auto)")
+                    setRequestProperty("User-Agent", "DarbNavigation/1.0 (contact: info@darb.app)")
                 }
 
                 if (conn.responseCode == 200) {

@@ -375,6 +375,8 @@ class DarbCarScreen(carContext: CarContext) : Screen(carContext),
             strokeWidth = 1f
         }
 
+        val tilePaint = Paint(Paint.FILTER_BITMAP_FLAG)
+
         for (tx in minTileX..maxTileX) {
             for (ty in minTileY..maxTileY) {
                 val tileBmp = tileManager.getTile(zoom, tx, ty, isSatellite, dark) {
@@ -384,7 +386,7 @@ class DarbCarScreen(carContext: CarContext) : Screen(carContext),
                 val drawY = (ty * 256.0 - worldY).toFloat()
 
                 if (tileBmp != null && !tileBmp.isRecycled) {
-                    canvas.drawBitmap(tileBmp, drawX, drawY, null)
+                    canvas.drawBitmap(tileBmp, drawX, drawY, tilePaint)
                 } else {
                     canvas.drawRect(drawX, drawY, drawX + 256f, drawY + 256f, placeholderPaint)
                 }
