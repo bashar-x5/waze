@@ -1,6 +1,9 @@
 package app.darb.darb
 
+import android.content.ComponentName
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
@@ -74,13 +77,43 @@ class MainActivity : FlutterActivity() {
                         result.error("ERROR", e.message, null)
                     }
                 }
+                "openAndroidAutoSettings" -> {
+                    var opened = false
+                    try {
+                        val intent = Intent().apply {
+                            action = Intent.ACTION_VIEW
+                            component = ComponentName(
+                                "com.google.android.projection.gearhead",
+                                "com.google.android.projection.gearhead.companion.settings.DefaultSettingsActivity"
+                            )
+                            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                        }
+                        startActivity(intent)
+                        opened = true
+                        result.success(true)
+                    } catch (_: Exception) {}
+
+                    if (!opened) {
+                        try {
+                            val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                                data = Uri.parse("package:com.google.android.projection.gearhead")
+                                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                            }
+                            startActivity(intent)
+                            result.success(true)
+                        } catch (e: Exception) {
+                            result.error("ERROR", "Could not open Android Auto settings: ${e.message}", null)
+                        }
+                    }
+                }
                 else -> result.notImplemented()
             }
         }
     }
 
     override fun cleanUpFlutterEngine(flutterEngine: FlutterEngine) {
-        CarBridge.unregister()
+        // Do not unregister CarBridge here so Android Auto session can keep running in background/car
         super.cleanUpFlutterEngine(flutterEngine)
     }
 }
+

@@ -176,7 +176,7 @@ class AndroidAutoService {
       step = r.steps[stepIdx];
       etaText = controller.duration(p.remainingSeconds);
       remainingDistanceText = controller.distance(p.remainingMeters);
-      stepDistMeters = step.distanceMeters;
+      stepDistMeters = p.stepRemainingMeters ?? step.distanceMeters;
     }
 
     var maneuverCode = 1; // Default Straight

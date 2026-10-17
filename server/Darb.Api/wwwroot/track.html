@@ -1,0 +1,937 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>دَرب شلّة — التتبع المباشر | Darb Live Convoy</title>
+  <link rel="icon" type="image/png" href="/favicon.png">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+
+  <!-- Google Fonts: Cairo & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&family=JetBrains+Mono:wght@600;700;800&display=swap" rel="stylesheet">
+
+  <!-- Leaflet CSS & JS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <style>
+    :root {
+      --bg: #090D16;
+      --card-bg: rgba(16, 23, 38, 0.88);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --primary: #00E676;
+      --primary-glow: rgba(0, 230, 118, 0.35);
+      --cyan: #00E5FF;
+      --amber: #FFB300;
+      --coral: #FF5252;
+      --text: #F8FAFC;
+      --text-muted: #94A3B8;
+      --font-main: 'Cairo', system-ui, sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      font-family: var(--font-main);
+      background-color: var(--bg);
+      color: var(--text);
+      height: 100vh;
+      height: 100dvh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    #map {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+      background: #090D16;
+    }
+
+    .leaflet-container {
+      background: #090D16 !important;
+    }
+
+    /* Top Floating Header */
+    .top-bar {
+      position: absolute;
+      top: 14px;
+      left: 14px;
+      right: 14px;
+      z-index: 1000;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      pointer-events: none;
+    }
+
+    .top-pill {
+      pointer-events: auto;
+      background: var(--card-bg);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--card-border);
+      border-radius: 20px;
+      padding: 8px 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+    }
+
+    .logo-badge {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 800;
+      font-size: 15px;
+    }
+
+    .logo-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--primary);
+      box-shadow: 0 0 10px var(--primary);
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(1.2); }
+    }
+
+    .room-code-tag {
+      font-family: var(--font-mono);
+      background: rgba(0, 230, 118, 0.14);
+      color: var(--primary);
+      border: 1px solid rgba(0, 230, 118, 0.3);
+      padding: 3px 10px;
+      border-radius: 12px;
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: 1.5px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .room-code-tag:active {
+      transform: scale(0.96);
+    }
+
+    .header-actions {
+      display: flex;
+      gap: 8px;
+      pointer-events: auto;
+    }
+
+    .btn-icon {
+      background: var(--card-bg);
+      backdrop-filter: blur(16px);
+      border: 1px solid var(--card-border);
+      color: var(--text);
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      cursor: pointer;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+      transition: all 0.2s ease;
+    }
+
+    .btn-icon:hover {
+      background: rgba(255, 255, 255, 0.12);
+      transform: translateY(-2px);
+    }
+
+    /* Floating Status & Timer */
+    .status-pill {
+      position: absolute;
+      top: 72px;
+      right: 14px;
+      z-index: 1000;
+      background: rgba(16, 23, 38, 0.85);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--card-border);
+      border-radius: 14px;
+      padding: 6px 14px;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      box-shadow: 0 6px 16px rgba(0,0,0,0.3);
+    }
+
+    .timer-text {
+      color: var(--amber);
+      font-family: var(--font-mono);
+      font-weight: 800;
+    }
+
+    /* Bottom Convoy Panel */
+    .bottom-panel {
+      position: absolute;
+      bottom: 16px;
+      left: 14px;
+      right: 14px;
+      z-index: 1000;
+      max-width: 520px;
+      margin: 0 auto;
+      pointer-events: auto;
+      background: var(--card-bg);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid var(--card-border);
+      border-radius: 24px;
+      padding: 16px 18px;
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55);
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .room-title {
+      font-size: 15px;
+      font-weight: 800;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .destination-badge {
+      font-size: 11px;
+      background: rgba(0, 229, 255, 0.12);
+      color: var(--cyan);
+      border: 1px solid rgba(0, 229, 255, 0.25);
+      border-radius: 8px;
+      padding: 2px 8px;
+      font-weight: 700;
+    }
+
+    /* Member Cards Carousel / List */
+    .members-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      max-height: 240px;
+      overflow-y: auto;
+      padding-left: 2px;
+    }
+
+    .members-list::-webkit-scrollbar {
+      width: 4px;
+    }
+    .members-list::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 4px;
+    }
+
+    .member-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 12px;
+      background: rgba(255, 255, 255, 0.04);
+      border-radius: 16px;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      cursor: pointer;
+      transition: background 0.2s ease;
+    }
+
+    .member-item:hover {
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    .member-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .member-avatar {
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      font-weight: 900;
+      color: #fff;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      position: relative;
+    }
+
+    .online-badge {
+      position: absolute;
+      bottom: -1px;
+      right: -1px;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: var(--primary);
+      border: 2px solid var(--bg);
+    }
+
+    .member-info h4 {
+      font-size: 14px;
+      font-weight: 800;
+      color: #fff;
+      margin-bottom: 2px;
+    }
+
+    .member-meta {
+      font-size: 11px;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .member-right {
+      text-align: left;
+    }
+
+    .speed-tag {
+      font-family: var(--font-mono);
+      font-size: 13px;
+      font-weight: 800;
+      color: var(--cyan);
+    }
+
+    .battery-tag {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    .share-row {
+      display: flex;
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .btn-share {
+      flex: 1;
+      background: rgba(0, 230, 118, 0.15);
+      color: var(--primary);
+      border: 1px solid rgba(0, 230, 118, 0.35);
+      padding: 10px 14px;
+      border-radius: 14px;
+      font-size: 13px;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      text-decoration: none;
+    }
+
+    .btn-share:active {
+      transform: scale(0.98);
+    }
+
+    .btn-whatsapp {
+      background: rgba(37, 211, 102, 0.2);
+      color: #25D366;
+      border-color: rgba(37, 211, 102, 0.4);
+    }
+
+    /* Custom Leaflet Map Markers */
+    .custom-car-marker {
+      background: none;
+      border: none;
+    }
+
+    .car-marker-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      transform: translate(-50%, -50%);
+    }
+
+    .car-pin-circle {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      border: 3px solid #fff;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.6);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      color: #fff;
+      position: relative;
+      transition: transform 0.4s ease;
+    }
+
+    .car-heading-arrow {
+      position: absolute;
+      top: -10px;
+      width: 0; 
+      height: 0; 
+      border-left: 6px solid transparent;
+      border-right: 6px solid transparent;
+      border-bottom: 10px solid #fff;
+    }
+
+    .car-label-pill {
+      background: rgba(16, 23, 38, 0.9);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      color: #fff;
+      font-size: 11px;
+      font-weight: 800;
+      padding: 2px 8px;
+      border-radius: 10px;
+      margin-top: 4px;
+      white-space: nowrap;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+    }
+
+    /* Modal / Overlay for Ended Room */
+    .overlay-message {
+      position: absolute;
+      inset: 0;
+      background: rgba(9, 13, 22, 0.95);
+      z-index: 2000;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 30px;
+      text-align: center;
+    }
+
+    .overlay-message.active {
+      display: flex;
+    }
+
+    /* Toast Notification */
+    .toast {
+      position: fixed;
+      bottom: 90px;
+      left: 50%;
+      transform: translateX(-50%) translateY(50px);
+      background: rgba(0, 230, 118, 0.95);
+      color: #000;
+      font-weight: 800;
+      padding: 10px 20px;
+      border-radius: 20px;
+      font-size: 13px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+      z-index: 3000;
+      opacity: 0;
+      transition: all 0.3s ease;
+      pointer-events: none;
+    }
+
+    .toast.show {
+      transform: translateX(-50%) translateY(0);
+      opacity: 1;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Fullscreen Map -->
+  <div id="map"></div>
+
+  <!-- Top Bar -->
+  <div class="top-bar">
+    <div class="top-pill">
+      <div class="logo-badge" style="gap: 8px;">
+        <img src="/darb_logo.png" alt="Darb Logo" style="width: 20px; height: 20px; border-radius: 6px; object-fit: cover; box-shadow: 0 0 8px rgba(0,210,255,0.4);">
+        <span>دَرب شلّة</span>
+      </div>
+      <div class="room-code-tag" id="roomCodeBadge" onclick="copyShareLink()" title="اضغط لنسخ الرابط">
+        <span id="roomCodeText">------</span>
+        <span>📋</span>
+      </div>
+    </div>
+
+    <div class="header-actions">
+      <button class="btn-icon" id="btnLayerToggle" onclick="cycleBasemap()" title="تبديل نمط الخريطة">🌙</button>
+      <button class="btn-icon" onclick="fitAllMembers()" title="تمركز على الجميع">🎯</button>
+      <a href="/darb.apk" class="btn-icon" title="تحميل تطبيق درب لأندرويد" style="text-decoration: none;">🤖</a>
+    </div>
+  </div>
+
+  <!-- Status & Timer -->
+  <div class="status-pill" id="statusPill">
+    <span>⏳ الصلاحية:</span>
+    <span class="timer-text" id="countdownTimer">--:--:--</span>
+  </div>
+
+  <!-- Bottom Convoy Panel -->
+  <div class="bottom-panel" id="bottomPanel">
+    <div class="panel-header">
+      <div class="room-title">
+        <span>🚗</span>
+        <span id="roomNameText">موكب الأصدقاء</span>
+      </div>
+      <div class="destination-badge" id="destBadge" style="display: none;">
+        <span>الوجهة:</span> <b id="destNameText">--</b>
+      </div>
+    </div>
+
+    <!-- Members List -->
+    <div class="members-list" id="membersList">
+      <div style="text-align: center; color: var(--text-muted); font-size: 13px; padding: 20px;">
+        جاري الاتصال بالغرفة وجلب المواقع المباشرة...
+      </div>
+    </div>
+
+    <!-- Share Buttons -->
+    <div class="share-row">
+      <button class="btn-share btn-whatsapp" onclick="shareToWhatsApp()">
+        <span>💬 مشاركة عبر واتساب</span>
+      </button>
+      <button class="btn-share" onclick="copyShareLink()">
+        <span>🔗 نسخ الرابط</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Overlay for Inactive/Expired Room -->
+  <div class="overlay-message" id="overlayEnded">
+    <div style="font-size: 54px; margin-bottom: 16px;">🏁</div>
+    <h2 style="font-size: 22px; font-weight: 900; margin-bottom: 8px;">تم إغلاق هذه الغرفة</h2>
+    <p style="font-size: 14px; color: var(--text-muted); line-height: 1.6; max-width: 340px; margin-bottom: 0;">
+      انتهت مدة صلاحية الغرفة المحددة أو قام المنشئ بإنهائها. للحفاظ على الخصوصية التامة لا يتم حفظ أو عرض المواقع السابقة.
+    </p>
+  </div>
+
+  <!-- Toast -->
+  <div class="toast" id="toast">تم نسخ الرابط للحافظة!</div>
+
+  <script>
+    // Extract Room Code from URL: /track/{CODE} or ?code={CODE}
+    let roomCode = '';
+    const pathParts = window.location.pathname.split('/').filter(p => p.length > 0);
+    if (pathParts.length >= 2 && pathParts[0].toLowerCase() === 'track') {
+      roomCode = pathParts[1].toUpperCase();
+    } else {
+      const urlParams = new URLSearchParams(window.location.search);
+      roomCode = (urlParams.get('code') || '').toUpperCase();
+    }
+
+    if (!roomCode) {
+      roomCode = 'DEMO01';
+    }
+
+    document.getElementById('roomCodeText').textContent = roomCode;
+
+    // Initialize Leaflet Map
+    const map = L.map('map', {
+      zoomControl: false,
+      attributionControl: false
+    }).setView([33.3152, 44.3661], 12); // Baghdad center
+
+    // Basemaps without API keys or watermarks (Esri Dark Gray Canvas, Esri Satellite, OSM)
+    const esriDarkBase = L.tileLayer('https://services.arcgisonline.com/arcgis/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
+      maxNativeZoom: 16,
+      maxZoom: 19,
+      subdomains: ['server', 'services'],
+      attribution: '&copy; Esri &mdash; Darb Convoy'
+    });
+    const esriDarkLabels = L.tileLayer('https://services.arcgisonline.com/arcgis/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}', {
+      maxNativeZoom: 16,
+      maxZoom: 19,
+      subdomains: ['server', 'services'],
+      attribution: ''
+    });
+    const darbDarkGroup = L.layerGroup([esriDarkBase, esriDarkLabels]);
+
+    const satelliteBase = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+      maxNativeZoom: 19,
+      maxZoom: 19,
+      attribution: '&copy; Esri World Imagery'
+    });
+    const satelliteRoads = L.tileLayer('https://services.arcgisonline.com/arcgis/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}', {
+      maxNativeZoom: 19,
+      maxZoom: 19,
+      attribution: ''
+    });
+    const satelliteLabels = L.tileLayer('https://services.arcgisonline.com/arcgis/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', {
+      maxNativeZoom: 19,
+      maxZoom: 19,
+      attribution: ''
+    });
+    const satelliteGroup = L.layerGroup([satelliteBase, satelliteRoads, satelliteLabels]);
+
+    const osmLayer = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; OpenStreetMap contributors'
+    });
+
+    const basemaps = [
+      { id: 'dark', name: 'الوضع الداكن', icon: '🌙', layer: darbDarkGroup },
+      { id: 'satellite', name: 'قمر صناعي', icon: '🛰️', layer: satelliteGroup },
+      { id: 'streets', name: 'خريطة الشوارع', icon: '🗺️', layer: osmLayer }
+    ];
+
+    let currentBasemapIdx = 0;
+    const savedBasemap = localStorage.getItem('darb_track_basemap');
+    if (savedBasemap) {
+      const idx = basemaps.findIndex(b => b.id === savedBasemap);
+      if (idx !== -1) currentBasemapIdx = idx;
+    }
+
+    // Activate selected basemap
+    basemaps[currentBasemapIdx].layer.addTo(map);
+
+    function updateLayerButton() {
+      const btn = document.getElementById('btnLayerToggle');
+      if (btn) {
+        btn.textContent = basemaps[currentBasemapIdx].icon;
+        btn.title = `الخريطة الحالية: ${basemaps[currentBasemapIdx].name} (اضغط للتبديل)`;
+      }
+    }
+
+    function cycleBasemap() {
+      map.removeLayer(basemaps[currentBasemapIdx].layer);
+      currentBasemapIdx = (currentBasemapIdx + 1) % basemaps.length;
+      basemaps[currentBasemapIdx].layer.addTo(map);
+      localStorage.setItem('darb_track_basemap', basemaps[currentBasemapIdx].id);
+      updateLayerButton();
+      showToast(`تم التبديل إلى: ${basemaps[currentBasemapIdx].name} ${basemaps[currentBasemapIdx].icon}`);
+    }
+
+    updateLayerButton();
+
+    // State
+    let membersMarkers = {};
+    let memberRouteLayers = {};
+    let routeCache = {};
+    let destinationMarker = null;
+    let roomData = null;
+    let pollInterval = null;
+
+    function showToast(msg) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.classList.add('show');
+      setTimeout(() => t.classList.remove('show'), 2500);
+    }
+
+    function copyShareLink() {
+      const url = window.location.origin + '/track/' + roomCode;
+      navigator.clipboard.writeText(url).then(() => {
+        showToast('تم نسخ الرابط! أرسله للأصدقاء أو الأهل 📋');
+      }).catch(() => {
+        prompt('انسخ الرابط التالي:', url);
+      });
+    }
+
+    function shareToWhatsApp() {
+      const url = window.location.origin + '/track/' + roomCode;
+      const text = encodeURIComponent(`تابع موقعنا المباشر على خريطة درب في غرفة (${roomData?.name || roomCode}):\n${url}`);
+      window.open(`https://wa.me/?text=${text}`, '_blank');
+    }
+
+    function updateCountdown(expiresAtStr) {
+      if (!expiresAtStr) return;
+      const expires = new Date(expiresAtStr).getTime();
+      const now = Date.now();
+      const diff = Math.max(0, Math.floor((expires - now) / 1000));
+
+      if (diff <= 0) {
+        document.getElementById('countdownTimer').textContent = 'منتهية';
+        document.getElementById('overlayEnded').classList.add('active');
+        return;
+      }
+
+      const h = Math.floor(diff / 3600);
+      const m = Math.floor((diff % 3600) / 60);
+      const s = diff % 60;
+      document.getElementById('countdownTimer').textContent = 
+        `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+    }
+
+    function fitAllMembers() {
+      const points = [];
+      if (roomData && roomData.members) {
+        roomData.members.forEach(m => points.push([m.latitude, m.longitude]));
+      }
+      if (roomData && roomData.destinationLat && roomData.destinationLon) {
+        points.push([roomData.destinationLat, roomData.destinationLon]);
+      }
+      if (points.length > 0) {
+        map.fitBounds(points, { padding: [80, 80], maxZoom: 16 });
+      }
+    }
+
+    function renderMembers(members) {
+      const listEl = document.getElementById('membersList');
+      if (!members || members.length === 0) {
+        listEl.innerHTML = '<div style="text-align: center; color: var(--text-muted); padding: 15px;">لا يوجد أعضاء متصلين حالياً</div>';
+        return;
+      }
+
+      listEl.innerHTML = members.map(m => {
+        const speed = Math.round(m.speedKmh || 0);
+        const battery = m.batteryPercent ? `${m.batteryPercent}% 🔋` : '';
+        const initial = (m.displayName || '؟').charAt(0);
+        const isOnline = m.isOnline;
+
+        return `
+          <div class="member-item" onclick="focusMember(${m.latitude}, ${m.longitude})">
+            <div class="member-left">
+              <div class="member-avatar" style="background: ${m.avatarColor || '#00E676'};">
+                ${initial}
+                <div class="online-badge" style="background: ${isOnline ? '#00E676' : '#94A3B8'};"></div>
+              </div>
+              <div class="member-info">
+                <h4>${m.displayName} ${m.isCreator ? '<span style="font-size: 10px; color: var(--amber);">★ المنشئ</span>' : ''}</h4>
+                <div class="member-meta">
+                  <span>${isOnline ? '🟢 متصل الآن' : '⚪ غير متصل'}</span>
+                  ${battery ? `<span>• ${battery}</span>` : ''}
+                </div>
+              </div>
+            </div>
+            <div class="member-right">
+              <div class="speed-tag">${speed} <span style="font-size: 10px;">كم/س</span></div>
+              ${m.etaSeconds ? `<div class="battery-tag">${Math.round(m.etaSeconds / 60)} دقيقة للهدف</div>` : ''}
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function focusMember(lat, lon) {
+      map.flyTo([lat, lon], 16, { animate: true, duration: 1.2 });
+    }
+
+    function updateMarkers(members) {
+      const currentIds = new Set();
+
+      members.forEach(m => {
+        currentIds.add(m.memberId);
+        const lat = m.latitude;
+        const lon = m.longitude;
+        const color = m.avatarColor || '#00E676';
+        const heading = m.heading || 0;
+
+        const customHtml = `
+          <div class="car-marker-container">
+            <div class="car-pin-circle" style="background: ${color}; border-color: ${color}; box-shadow: 0 0 16px ${color}88;">
+              🚗
+              <div class="car-heading-arrow" style="transform: rotate(${heading}deg);"></div>
+            </div>
+            <div class="car-label-pill">${m.displayName}</div>
+          </div>
+        `;
+
+        const icon = L.divIcon({
+          className: 'custom-car-marker',
+          html: customHtml,
+          iconSize: [44, 44],
+          iconAnchor: [22, 22]
+        });
+
+        if (membersMarkers[m.memberId]) {
+          membersMarkers[m.memberId].setLatLng([lat, lon]);
+          membersMarkers[m.memberId].setIcon(icon);
+        } else {
+          membersMarkers[m.memberId] = L.marker([lat, lon], { icon }).addTo(map);
+        }
+      });
+
+      // Remove disconnected markers
+      Object.keys(membersMarkers).forEach(id => {
+        if (!currentIds.has(id)) {
+          map.removeLayer(membersMarkers[id]);
+          delete membersMarkers[id];
+        }
+      });
+    }
+
+    async function fetchRoomData() {
+      try {
+        const res = await fetch(`/api/rooms/${roomCode}`);
+        if (!res.ok) {
+          if (res.status === 404) {
+            document.getElementById('overlayEnded').classList.add('active');
+            clearInterval(pollInterval);
+          }
+          return;
+        }
+
+        const data = await res.json();
+        roomData = data;
+
+        if (!data.isActive) {
+          document.getElementById('overlayEnded').classList.add('active');
+          clearInterval(pollInterval);
+          return;
+        }
+
+        document.getElementById('roomNameText').textContent = data.name;
+        document.getElementById('roomCodeText').textContent = data.code;
+
+        if (data.destinationName) {
+          document.getElementById('destBadge').style.display = 'inline-flex';
+          document.getElementById('destNameText').textContent = data.destinationName;
+        }
+
+        // Render destination pin if coordinates provided
+        if (data.destinationLat && data.destinationLon) {
+          const destHtml = `
+            <div class="car-marker-container">
+              <div class="car-pin-circle" style="background: #FF5252; border-color: #fff; box-shadow: 0 0 16px rgba(255,82,82,0.7);">
+                🏁
+              </div>
+              <div class="car-label-pill" style="border-color: rgba(255,82,82,0.4);">${data.destinationName || 'الوجهة'}</div>
+            </div>
+          `;
+          const destIcon = L.divIcon({
+            className: 'custom-car-marker',
+            html: destHtml,
+            iconSize: [44, 44],
+            iconAnchor: [22, 22]
+          });
+          if (destinationMarker) {
+            destinationMarker.setLatLng([data.destinationLat, data.destinationLon]);
+            destinationMarker.setIcon(destIcon);
+          } else {
+            destinationMarker = L.marker([data.destinationLat, data.destinationLon], { icon: destIcon }).addTo(map);
+          }
+        } else if (destinationMarker) {
+          map.removeLayer(destinationMarker);
+          destinationMarker = null;
+        }
+
+        updateCountdown(data.expiresAt);
+        renderMembers(data.members);
+        updateMarkers(data.members);
+        updateMemberRoutes(data.members, data.destinationLat, data.destinationLon);
+
+      } catch (e) {
+        console.error('Failed to poll room:', e);
+      }
+    }
+
+    async function updateMemberRoutes(members, destLat, destLon) {
+      if (!destLat || !destLon || !members || members.length === 0) {
+        Object.keys(memberRouteLayers).forEach(id => {
+          map.removeLayer(memberRouteLayers[id]);
+          delete memberRouteLayers[id];
+          delete routeCache[id];
+        });
+        return;
+      }
+
+      const activeMemberIds = new Set();
+
+      for (const m of members) {
+        if (!m.latitude || !m.longitude) continue;
+        activeMemberIds.add(m.memberId);
+        const mId = m.memberId;
+        const color = m.avatarColor || '#00E676';
+        const last = routeCache[mId];
+
+        // If member moved less than ~30 meters and route exists, update just first point
+        if (last && Math.hypot(last.lat - m.latitude, last.lon - m.longitude) < 0.0003 &&
+            last.destLat === destLat && last.destLon === destLon && memberRouteLayers[mId]) {
+          const latlngs = memberRouteLayers[mId].getLatLngs();
+          if (latlngs.length > 0) {
+            latlngs[0] = L.latLng(m.latitude, m.longitude);
+            memberRouteLayers[mId].setLatLngs(latlngs);
+          }
+          continue;
+        }
+
+        routeCache[mId] = { lat: m.latitude, lon: m.longitude, destLat, destLon };
+
+        try {
+          const url = `https://router.project-osrm.org/route/v1/driving/${m.longitude},${m.latitude};${destLon},${destLat}?overview=full&geometries=geojson`;
+          const res = await fetch(url);
+          if (res.ok) {
+            const json = await res.json();
+            if (json.routes && json.routes.length > 0) {
+              const coords = json.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
+              if (memberRouteLayers[mId]) {
+                memberRouteLayers[mId].setLatLngs(coords);
+                memberRouteLayers[mId].setStyle({ color: color });
+              } else {
+                memberRouteLayers[mId] = L.polyline(coords, {
+                  color: color,
+                  weight: 5,
+                  opacity: 0.85,
+                  dashArray: '8, 8',
+                  lineCap: 'round',
+                  lineJoin: 'round'
+                }).addTo(map);
+              }
+              continue;
+            }
+          }
+        } catch (e) {
+          // fallback direct
+        }
+
+        const directCoords = [[m.latitude, m.longitude], [destLat, destLon]];
+        if (memberRouteLayers[mId]) {
+          memberRouteLayers[mId].setLatLngs(directCoords);
+          memberRouteLayers[mId].setStyle({ color: color });
+        } else {
+          memberRouteLayers[mId] = L.polyline(directCoords, {
+            color: color,
+            weight: 4,
+            opacity: 0.75,
+            dashArray: '6, 8'
+          }).addTo(map);
+        }
+      }
+
+      // Remove routes for members who left
+      Object.keys(memberRouteLayers).forEach(id => {
+        if (!activeMemberIds.has(id)) {
+          map.removeLayer(memberRouteLayers[id]);
+          delete memberRouteLayers[id];
+          delete routeCache[id];
+        }
+      });
+    }
+
+    // Initial fetch and poll every 3 seconds
+    fetchRoomData().then(() => {
+      fitAllMembers();
+    });
+    pollInterval = setInterval(fetchRoomData, 3000);
+    setInterval(() => {
+      if (roomData) updateCountdown(roomData.expiresAt);
+    }, 1000);
+  </script>
+</body>
+</html>

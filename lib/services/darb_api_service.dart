@@ -304,6 +304,192 @@ class DarbApiService {
     }
   }
 
+  /// Creates a new live convoy or family tracking room.
+  Future<LiveRoom?> createLiveRoom({
+    String? name,
+    String mode = 'convoy',
+    int durationMinutes = 120,
+    required String creatorId,
+    required String creatorName,
+    String? avatarColor,
+    required LatLng point,
+    double speedKmh = 0.0,
+    double? heading,
+    int? batteryPercent,
+    String? destinationName,
+    LatLng? destinationPoint,
+  }) async {
+    if (_disposed) return null;
+    final uri = Uri.parse('$_baseUrl/api/rooms');
+    try {
+      final response = await _client
+          .post(
+            uri,
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              if (name != null && name.isNotEmpty) 'name': name,
+              'mode': mode,
+              'durationMinutes': durationMinutes,
+              'creatorId': creatorId,
+              'creatorName': creatorName,
+              if (avatarColor != null) 'avatarColor': avatarColor,
+              'latitude': point.latitude,
+              'longitude': point.longitude,
+              'speedKmh': speedKmh,
+              if (heading != null) 'heading': heading,
+              if (batteryPercent != null) 'batteryPercent': batteryPercent,
+              if (destinationName != null) 'destinationName': destinationName,
+              if (destinationPoint != null) ...{
+                'destinationLat': destinationPoint.latitude,
+                'destinationLon': destinationPoint.longitude,
+              },
+            }),
+          )
+          .timeout(const Duration(seconds: 8));
+
+      if (response.statusCode != 200) return null;
+      final map = jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
+      return LiveRoom.fromJson(map);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Fetches the live room status and active members.
+  /// Room code is 6 characters alphanumeric, case-insensitive.
+  Future<LiveRoom?> fetchLiveRoom(String code) async {
+    if (_disposed) return null;
+    final cleanCode = code.trim().toUpperCase();
+    if (cleanCode.isEmpty) return null;
+    final uri = Uri.parse('$_baseUrl/api/rooms/${Uri.encodeComponent(cleanCode)}');
+    try {
+      final response = await _client
+          .get(uri, headers: {'Accept': 'application/json'})
+          .timeout(const Duration(seconds: 6));
+
+      if (response.statusCode != 200) return null;
+      final map = jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
+      return LiveRoom.fromJson(map);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Updates member position, speed, battery, etc., and receives updated room snapshot.
+  Future<LiveRoom?> pingLiveRoom({
+    required String code,
+    required String memberId,
+    String? displayName,
+    String? avatarColor,
+    required LatLng point,
+    double speedKmh = 0.0,
+    double? heading,
+    int? batteryPercent,
+    double? distanceToDestMeters,
+    double? etaSeconds,
+  }) async {
+    if (_disposed) return null;
+    final cleanCode = code.trim().toUpperCase();
+    final uri = Uri.parse('$_baseUrl/api/rooms/${Uri.encodeComponent(cleanCode)}/ping');
+    try {
+      final response = await _client
+          .post(
+            uri,
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'memberId': memberId,
+              if (displayName != null) 'displayName': displayName,
+              if (avatarColor != null) 'avatarColor': avatarColor,
+              'latitude': point.latitude,
+              'longitude': point.longitude,
+              'speedKmh': speedKmh,
+              if (heading != null) 'heading': heading,
+              if (batteryPercent != null) 'batteryPercent': batteryPercent,
+              if (distanceToDestMeters != null) 'distanceToDestMeters': distanceToDestMeters,
+              if (etaSeconds != null) 'etaSeconds': etaSeconds,
+            }),
+          )
+          .timeout(const Duration(seconds: 5));
+
+      if (response.statusCode != 200) return null;
+      final map = jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
+      return LiveRoom.fromJson(map);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Leaves a live room.
+  Future<bool> leaveLiveRoom({
+    required String code,
+    required String memberId,
+  }) async {
+    if (_disposed) return false;
+    final cleanCode = code.trim().toUpperCase();
+    final uri = Uri.parse(
+        '$_baseUrl/api/rooms/${Uri.encodeComponent(cleanCode)}/leave?memberId=${Uri.encodeComponent(memberId)}');
+    try {
+      final response = await _client.post(uri).timeout(const Duration(seconds: 5));
+      return response.statusCode == 200;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Ends a live room (creator only).
+  Future<bool> endLiveRoom({
+    required String code,
+    required String requesterId,
+  }) async {
+    if (_disposed) return false;
+    final cleanCode = code.trim().toUpperCase();
+    final uri = Uri.parse('$_baseUrl/api/rooms/${Uri.encodeComponent(cleanCode)}/end');
+    try {
+      final response = await _client
+          .post(
+            uri,
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({'requesterId': requesterId}),
+          )
+          .timeout(const Duration(seconds: 5));
+      return response.statusCode == 200;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Sets or updates the destination for a live room (convoy).
+  Future<LiveRoom?> setLiveRoomDestination({
+    required String code,
+    required String requesterId,
+    required String destinationName,
+    required LatLng destinationPoint,
+  }) async {
+    if (_disposed) return null;
+    final cleanCode = code.trim().toUpperCase();
+    final uri = Uri.parse('$_baseUrl/api/rooms/${Uri.encodeComponent(cleanCode)}/destination');
+    try {
+      final response = await _client
+          .post(
+            uri,
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'requesterId': requesterId,
+              'destinationName': destinationName,
+              'destinationLat': destinationPoint.latitude,
+              'destinationLon': destinationPoint.longitude,
+            }),
+          )
+          .timeout(const Duration(seconds: 5));
+
+      if (response.statusCode != 200) return null;
+      final map = jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
+      return LiveRoom.fromJson(map);
+    } catch (_) {
+      return null;
+    }
+  }
+
   void dispose() {
     _disposed = true;
     if (_ownsClient) {

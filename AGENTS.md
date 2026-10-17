@@ -1,4 +1,4 @@
-﻿# AGENTS.md — Development & Architecture Context for AI Agents & Developers
+# AGENTS.md — Development & Architecture Context for AI Agents & Developers
 
 This document provides complete operational, architectural, and development context for any AI assistant (Antigravity, Cursor, Claude Code, Copilot) or developer working on the **Darb** codebase.
 
@@ -89,3 +89,4 @@ ssh -i a ubuntu@139.185.47.123 sudo docker cp /home/ubuntu/darb/server/Darb.Api/
    `
 3. **Parking Persistence**: The parkedLocation (ParkedCarLocation) is stored in SharedPreferences under key darb.preferences.v1. Do not mutate this key structure without maintaining backwards compatibility.
 4. **Offline & Zero Cloud Cost**: Never add paid client-side API keys (Google Maps, Mapbox). Use OpenFreeMap vector tiles, OSRM routing, and local server caching.
+5. **Always Deploy Live APK**: Whenever any update or modification is made to the app, always compile the release APK (`flutter build apk --release`) and deploy it to the live server (`ubuntu@139.185.47.123`) at `darb-api:/app/wwwroot/darb.apk` so users downloading `/darb.apk` always receive the latest build.

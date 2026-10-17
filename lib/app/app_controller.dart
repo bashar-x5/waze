@@ -42,6 +42,7 @@ class AppController extends ChangeNotifier {
   DateTime? _lastGpsObservationSent;
   SharedPreferences? _prefs;
   FlutterTts? _tts;
+  bool? _ttsLanguageConfiguredForArabic;
   CommunityService _community = CommunityService();
   StreamSubscription<Position>? _gps;
   StreamSubscription<List<RoadReport>>? _reportStream;
@@ -49,8 +50,22 @@ class AppController extends ChangeNotifier {
   Timer? _expiry;
   Timer? _serverIncidentsTimer;
   Timer? _updateCheckTimer;
-  static const int localAppVersionCode = 6;
-  static const String localAppVersionName = '1.0.6';
+  Timer? _liveRoomTimer;
+  LiveRoom? activeLiveRoom;
+  String? userDisplayName;
+  VoidCallback? onFitConvoyTrack;
+  void Function(LatLng point)? onAnimateCameraTo;
+
+  void requestFitConvoyTrack() {
+    onFitConvoyTrack?.call();
+  }
+
+  void animateCameraTo(LatLng point) {
+    onAnimateCameraTo?.call(point);
+  }
+
+  static const int localAppVersionCode = 8;
+  static const String localAppVersionName = '1.0.8';
   Map<String, dynamic>? updateAvailableInfo;
   RoadReport? pendingPromptReport;
   final Set<String> _promptedIncidentIds = {};
@@ -127,6 +142,7 @@ class AppController extends ChangeNotifier {
       _deviceModel = _prefs!.getString('darb.device_model.v1');
       _deviceName = _prefs!.getString('darb.device_name.v1');
       _osVersion = _prefs!.getString('darb.device_os.v1');
+      userDisplayName = _prefs!.getString('darb.user_display_name.v1');
 
       // Fetch real hardware Android ID & device info from native platform channel
       if (enableDeviceServices && defaultTargetPlatform == TargetPlatform.android) {
@@ -287,9 +303,12 @@ class AppController extends ChangeNotifier {
 
   void filterSamples(String query, {PlaceCategory? category}) {
     final q = query.trim().toLowerCase();
-    searchResults = demoPlaces.where((p) =>
+    final list = demoPlaces.where((p) =>
       (category == null || p.category == category) &&
       (q.isEmpty || '${p.name} ${p.nameAr} ${p.subtitle}'.toLowerCase().contains(q))).toList();
+    const dist = Distance();
+    list.sort((a, b) => dist.as(LengthUnit.Meter, position, a.point).compareTo(dist.as(LengthUnit.Meter, position, b.point)));
+    searchResults = list;
     _emit();
   }
 
@@ -301,8 +320,11 @@ class AppController extends ChangeNotifier {
     try {
       final found = await _search.search(query, near: position);
       if (ticket != _searchRequest || _disposed) return;
-      searchResults = found;
-      if (found.isEmpty) notice = tr('No places found. Try another name or hold the map to drop a pin.', 'لا توجد نتائج. جرّب اسماً آخر أو اضغط مطولاً على الخريطة.');
+      final sortedFound = List<Place>.from(found);
+      const dist = Distance();
+      sortedFound.sort((a, b) => dist.as(LengthUnit.Meter, position, a.point).compareTo(dist.as(LengthUnit.Meter, position, b.point)));
+      searchResults = sortedFound;
+      if (sortedFound.isEmpty) notice = tr('No places found. Try another name or hold the map to drop a pin.', 'لا توجد نتائج. جرّب اسماً آخر أو اضغط مطولاً على الخريطة.');
     } catch (e) {
       if (ticket != _searchRequest || _disposed) return;
       error = _message(e);
@@ -314,24 +336,34 @@ class AppController extends ChangeNotifier {
   Future<List<Place>> searchPlacesDirect(String query) async {
     final clean = query.trim();
     if (clean.isEmpty) return const [];
+    const dist = Distance();
     if (demoMode) {
       final q = clean.toLowerCase();
       final localMatches = demoPlaces.where((p) =>
         '${p.name} ${p.nameAr} ${p.subtitle} ${p.subtitleAr}'.toLowerCase().contains(q)).toList();
-      if (localMatches.isNotEmpty) return localMatches;
+      if (localMatches.isNotEmpty) {
+        localMatches.sort((a, b) => dist.as(LengthUnit.Meter, position, a.point).compareTo(dist.as(LengthUnit.Meter, position, b.point)));
+        return localMatches;
+      }
     }
     try {
       final results = await _search.search(clean, near: position);
-      if (results.isNotEmpty) return results;
+      if (results.isNotEmpty) {
+        final sorted = List<Place>.from(results);
+        sorted.sort((a, b) => dist.as(LengthUnit.Meter, position, a.point).compareTo(dist.as(LengthUnit.Meter, position, b.point)));
+        return sorted;
+      }
     } catch (e) {
       debugPrint('Voice search direct error: $e');
     }
     // Fallback to local demo places matching query words
     final words = clean.toLowerCase().split(RegExp(r'\s+'));
-    return demoPlaces.where((p) {
+    final matches = demoPlaces.where((p) {
       final text = '${p.name} ${p.nameAr} ${p.subtitle} ${p.subtitleAr}'.toLowerCase();
       return words.any((w) => w.length > 2 && text.contains(w));
     }).toList();
+    matches.sort((a, b) => dist.as(LengthUnit.Meter, position, a.point).compareTo(dist.as(LengthUnit.Meter, position, b.point)));
+    return matches;
   }
 
   Future<void> executeVoiceCommand(VoiceCommandResult result) async {
@@ -395,6 +427,26 @@ class AppController extends ChangeNotifier {
     recent.removeWhere((p) => p.id == place.id);
     recent.insert(0, place); recent = recent.take(10).toList(); _save();
     await refreshRoutes();
+    if (activeLiveRoom != null && activeLiveRoom!.creatorId == _sessionId && !asStop) {
+      setLiveRoomDestination(place);
+    }
+  }
+
+  Future<void> setLiveRoomDestination(Place dest) async {
+    final room = activeLiveRoom;
+    if (room == null) return;
+    try {
+      final updated = await _api.setLiveRoomDestination(
+        code: room.code,
+        requesterId: _sessionId,
+        destinationName: dest.label(arabic),
+        destinationPoint: dest.point,
+      );
+      if (updated != null) {
+        activeLiveRoom = updated;
+        _emit();
+      }
+    } catch (_) {}
   }
 
   void saveParkingLocation({LatLng? point, String? note}) {
@@ -482,11 +534,11 @@ class AppController extends ChangeNotifier {
           notice = tr('Route updated.', 'تم تحديث المسار.');
         }
       } else if (routes.isNotEmpty && routes.first.hasTraffic) {
-        final totalMin = (routes.first.totalDurationSeconds / 60).ceil();
-        final delayMin = (routes.first.trafficDelaySeconds / 60).round();
+        final totalStr = duration(routes.first.totalDurationSeconds);
+        final delayStr = duration(routes.first.trafficDelaySeconds);
         notice = tr(
-          'Total travel time: $totalMin min (includes +$delayMin min traffic delay).',
-          'الوقت الإجمالي للرحلة: $totalMin دقيقة (شامل تأخير الازدحام +$delayMin د).',
+          'Total travel time: $totalStr (includes +$delayStr traffic delay).',
+          'الوقت الإجمالي للرحلة: $totalStr (شامل تأخير الازدحام +$delayStr).',
         );
       }
     } catch (e) {
@@ -595,6 +647,7 @@ class AppController extends ChangeNotifier {
     }
     navigating = true; arrived = false; showParkingPrompt = false; _spokenStep = -1; _offRouteSamples = 0;
     _spokenManeuverSignatures.clear();
+    _announcedWarningIds.clear();
     _lastSpokenPhrase = null;
     _lastSpokenTimestamp = null;
     progress = null;
@@ -712,19 +765,7 @@ class AppController extends ChangeNotifier {
         'الحمد لله على سلامتك! لقد وصلت إلى وجهتك بنجاح.',
       );
     } else {
-      if (current.steps.isNotEmpty) {
-        final step = current.steps[p.stepIndex.clamp(0, current.steps.length - 1)];
-        final maneuverKey = '${step.type}_${step.instruction}_'
-            '${step.point.latitude.toStringAsFixed(4)}_${step.point.longitude.toStringAsFixed(4)}';
-
-        if (!_spokenManeuverSignatures.contains(maneuverKey)) {
-          _spokenManeuverSignatures.add(maneuverKey);
-          _spokenStep = p.stepIndex;
-          if (!lessChatty || !step.type.contains('continue')) {
-            _speak(step.label(arabic));
-          }
-        }
-      }
+      _checkManeuverVoiceGuidance(current, p);
 
       // Auto-reroute when taking a wrong turn:
       // Require confirmed heading divergence with distance > 25m or major off-route > 50m
@@ -757,9 +798,86 @@ class AppController extends ChangeNotifier {
     _emit();
   }
 
+  void _checkManeuverVoiceGuidance(DriveRoute currentRoute, NavigationProgress p) {
+    if (!voice || currentRoute.steps.isEmpty) return;
+
+    // 1. Initial departure announcement
+    if (p.traveledMeters < 35) {
+      const departKey = 'depart_start';
+      if (!_spokenManeuverSignatures.contains(departKey)) {
+        _spokenManeuverSignatures.add(departKey);
+        final firstStep = currentRoute.steps.first;
+        if (!lessChatty || !firstStep.type.contains('continue')) {
+          _speak(firstStep.label(arabic));
+        }
+      }
+    }
+
+    final stepIdx = p.stepIndex.clamp(0, currentRoute.steps.length - 1);
+    final distRemainingOnStep = p.stepRemainingMeters ?? 0.0;
+
+    // 2. Upcoming turn / maneuver guidance in advance of the intersection
+    if (stepIdx + 1 < currentRoute.steps.length) {
+      final nextStep = currentRoute.steps[stepIdx + 1];
+      final currentStepLen = currentRoute.steps[stepIdx].distanceMeters;
+
+      // Far warning (~1 km) for long road stretches
+      if (distRemainingOnStep <= 1000 && distRemainingOnStep > 500 && currentStepLen >= 1200) {
+        final farKey = '${stepIdx + 1}_far';
+        if (!_spokenManeuverSignatures.contains(farKey)) {
+          _spokenManeuverSignatures.add(farKey);
+          final msg = arabic
+              ? 'بعد كيلومتر واحد، ${nextStep.label(true)}'
+              : 'In 1 kilometer, ${nextStep.label(false)}';
+          _speak(msg);
+        }
+      }
+
+      // Medium advance warning (250m - 380m) before the turn
+      if (distRemainingOnStep <= 350 && distRemainingOnStep > 80) {
+        final nearKey = '${stepIdx + 1}_near';
+        if (!_spokenManeuverSignatures.contains(nearKey)) {
+          _spokenManeuverSignatures.add(nearKey);
+          final roundedDist = distRemainingOnStep >= 250 ? 300 : 200;
+          final msg = arabic
+              ? 'بعد $roundedDist متر، ${nextStep.label(true)}'
+              : 'In $roundedDist meters, ${nextStep.label(false)}';
+          _speak(msg);
+        }
+      }
+
+      // Imminent action prompt (45m - 65m) right before the intersection
+      if (distRemainingOnStep <= 65 && distRemainingOnStep >= 15) {
+        final nowKey = '${stepIdx + 1}_now';
+        if (!_spokenManeuverSignatures.contains(nowKey)) {
+          _spokenManeuverSignatures.add(nowKey);
+          final msg = arabic
+              ? '${nextStep.label(true)} الآن'
+              : '${nextStep.label(false)} now';
+          _speak(msg);
+        }
+      }
+    } else {
+      // 3. Destination approach warning
+      if (p.remainingMeters <= 350 && p.remainingMeters > 80) {
+        const destNearKey = 'dest_near';
+        if (!_spokenManeuverSignatures.contains(destNearKey)) {
+          _spokenManeuverSignatures.add(destNearKey);
+          _speak(arabic ? 'الوجهة بعد 300 متر' : 'Destination ahead in 300 meters');
+        }
+      } else if (p.remainingMeters <= 65 && p.remainingMeters >= 20) {
+        const destNowKey = 'dest_now';
+        if (!_spokenManeuverSignatures.contains(destNowKey)) {
+          _spokenManeuverSignatures.add(destNowKey);
+          _speak(arabic ? 'اقتربت من وجهتك' : 'Approaching destination');
+        }
+      }
+    }
+  }
+
   void _checkRouteAlerts(DriveRoute currentRoute, NavigationProgress p) {
     if (!voice) return;
-    const alertDistanceMeters = 380.0;
+    const alertDistanceMeters = 350.0;
     const distCalc = Distance();
 
     for (final rep in reports) {
@@ -774,36 +892,47 @@ class AppController extends ChangeNotifier {
       }
 
       final metersAway = distCalc.as(LengthUnit.Meter, position, rep.point);
-      if (metersAway <= alertDistanceMeters && metersAway >= 35) {
-        final alertKey = '${rep.id}_${rep.type.name}';
-        if (!_announcedWarningIds.contains(alertKey)) {
-          _announcedWarningIds.add(alertKey);
-          String warningMsg;
-          if (rep.type == ReportType.bump || rep.isRoadWarning) {
-            warningMsg = arabic
-                ? 'انتبه: مطب اصطناعي بعد ${(metersAway).round()} متر'
-                : 'Caution: Speed bump ahead in ${(metersAway).round()} meters';
+      if (metersAway > alertDistanceMeters || metersAway < 25) continue;
 
-            // Ask driver if bump is still there
-            if (pendingPromptReport == null && !_promptedIncidentIds.contains(rep.id)) {
-              pendingPromptReport = rep;
-            }
-          } else if (rep.type == ReportType.camera) {
-            warningMsg = arabic
-                ? 'انتبه: رادار مراقبة سرعة أمامك'
-                : 'Caution: Speed camera ahead';
-          } else if (rep.type == ReportType.crash) {
-            warningMsg = arabic
-                ? 'انتبه: حادث سير أمامك'
-                : 'Caution: Traffic accident ahead';
-          } else {
-            warningMsg = arabic
-                ? 'انتبه: خطر على الطريق أمامك'
-                : 'Caution: Road hazard ahead';
-          }
-          _speak(warningMsg);
-          notice = '⚠️ $warningMsg';
+      // Heading orientation filter: report must be ahead in the direction of vehicle travel
+      if (heading.isFinite && heading >= 0) {
+        final bearingToReport = distCalc.bearing(position, rep.point);
+        final headingDiff = ((bearingToReport - heading + 180) % 360 - 180).abs();
+        if (headingDiff > 75) {
+          // Object is behind the vehicle or on a perpendicular cross street
+          continue;
         }
+      }
+
+      final alertKey = '${rep.id}_${rep.type.name}';
+      if (!_announcedWarningIds.contains(alertKey)) {
+        _announcedWarningIds.add(alertKey);
+        String warningMsg;
+        if (rep.type == ReportType.bump || rep.isRoadWarning) {
+          final roundedMeters = metersAway >= 200 ? 250 : 150;
+          warningMsg = arabic
+              ? 'انتبه: مطب اصطناعي بعد $roundedMeters متر'
+              : 'Caution: Speed bump in $roundedMeters meters';
+
+          // Ask driver if bump is still there
+          if (pendingPromptReport == null && !_promptedIncidentIds.contains(rep.id)) {
+            pendingPromptReport = rep;
+          }
+        } else if (rep.type == ReportType.camera) {
+          warningMsg = arabic
+              ? 'انتبه: رادار مراقبة سرعة أمامك'
+              : 'Caution: Speed camera ahead';
+        } else if (rep.type == ReportType.crash) {
+          warningMsg = arabic
+              ? 'انتبه: حادث سير أمامك'
+              : 'Caution: Traffic accident ahead';
+        } else {
+          warningMsg = arabic
+              ? 'انتبه: خطر على الطريق أمامك'
+              : 'Caution: Road hazard ahead';
+        }
+        _speak(warningMsg);
+        notice = '⚠️ $warningMsg';
       }
     }
   }
@@ -886,10 +1015,10 @@ class AppController extends ChangeNotifier {
   Future<void> _speak(String text, {bool force = false}) async {
     if (!voice || !enableDeviceServices || text.trim().isEmpty) return;
     final now = DateTime.now();
-    // Do not repeat identical phrase within 25 seconds unless forced
+    // Do not repeat identical phrase within 15 seconds unless forced
     if (!force && _lastSpokenPhrase == text) {
       if (_lastSpokenTimestamp != null &&
-          now.difference(_lastSpokenTimestamp!).inSeconds < 25) {
+          now.difference(_lastSpokenTimestamp!).inSeconds < 15) {
         return;
       }
     }
@@ -897,28 +1026,34 @@ class AppController extends ChangeNotifier {
     _lastSpokenTimestamp = now;
 
     try {
-      _tts ??= FlutterTts();
-      await _tts!.setVolume(1.0);
-      await _tts!.setSpeechRate(0.5);
-      await _tts!.setPitch(1.0);
+      if (_tts == null) {
+        _tts = FlutterTts();
+        await _tts!.setVolume(1.0);
+        await _tts!.setSpeechRate(0.53);
+        await _tts!.setPitch(1.0);
+        await _tts!.awaitSpeakCompletion(false);
+      }
 
-      if (arabic) {
-        var langSet = false;
-        for (final lang in const ['ar-SA', 'ar', 'ar-EG', 'ar-XA']) {
-          try {
-            final avail = await _tts!.isLanguageAvailable(lang);
-            if (avail == 1 || avail == true) {
-              await _tts!.setLanguage(lang);
-              langSet = true;
-              break;
-            }
-          } catch (_) {}
+      if (_ttsLanguageConfiguredForArabic != arabic) {
+        if (arabic) {
+          var langSet = false;
+          for (final lang in const ['ar-SA', 'ar', 'ar-EG', 'ar-XA']) {
+            try {
+              final avail = await _tts!.isLanguageAvailable(lang);
+              if (avail == 1 || avail == true) {
+                await _tts!.setLanguage(lang);
+                langSet = true;
+                break;
+              }
+            } catch (_) {}
+          }
+          if (!langSet) {
+            try { await _tts!.setLanguage('ar'); } catch (_) {}
+          }
+        } else {
+          await _tts!.setLanguage('en-US');
         }
-        if (!langSet) {
-          try { await _tts!.setLanguage('ar'); } catch (_) {}
-        }
-      } else {
-        await _tts!.setLanguage('en-US');
+        _ttsLanguageConfiguredForArabic = arabic;
       }
 
       await _tts!.speak(text);
@@ -1144,12 +1279,196 @@ class AppController extends ChangeNotifier {
     if (meters < 1000) return meters.round().toString() + tr(' m', ' م');
     return (meters / 1000).toStringAsFixed(1) + tr(' km', ' كم');
   }
-  String duration(double seconds) => max(1, (seconds / 60).ceil()).toString() + tr(' min', ' د');
+  String duration(double seconds) {
+    final totalMinutes = max(1, (seconds / 60).ceil());
+    final hours = totalMinutes ~/ 60;
+    final minutes = totalMinutes % 60;
+
+    if (hours > 0) {
+      if (minutes > 0) {
+        return arabic ? '$hours س $minutes د' : '${hours}h ${minutes}min';
+      } else {
+        return arabic ? '$hours س' : '${hours}h';
+      }
+    } else {
+      return arabic ? '$minutes د' : '$minutes min';
+    }
+  }
   String _id(String prefix) => '$prefix-${DateTime.now().microsecondsSinceEpoch}-${Random().nextInt(99999)}';
+
+  Future<void> setUserDisplayName(String name) async {
+    userDisplayName = name.trim();
+    await _prefs?.setString('darb.user_display_name.v1', userDisplayName!);
+    _emit();
+  }
+
+  Future<LiveRoom?> createLiveRoom({
+    String? name,
+    String mode = 'convoy',
+    int durationMinutes = 120,
+    String? displayName,
+    Place? convoyDestination,
+  }) async {
+    if (displayName != null && displayName.trim().isNotEmpty) {
+      await setUserDisplayName(displayName);
+    }
+    final creatorName = (userDisplayName != null && userDisplayName!.isNotEmpty)
+        ? userDisplayName!
+        : (arabic ? 'أنا' : 'Me');
+    final targetDest = convoyDestination ?? destination;
+    final room = await _api.createLiveRoom(
+      name: name,
+      mode: mode,
+      durationMinutes: durationMinutes,
+      creatorId: _sessionId,
+      creatorName: creatorName,
+      point: position,
+      speedKmh: speedKph,
+      heading: heading,
+      destinationName: targetDest?.label(arabic),
+      destinationPoint: targetDest?.point,
+    );
+    if (room != null) {
+      activeLiveRoom = room;
+      _startLiveRoomPingTimer();
+      if (targetDest != null && destination?.id != targetDest.id) {
+        chooseDestination(targetDest);
+      }
+      _emit();
+    }
+    return room;
+  }
+
+  void _syncRoomDestination(LiveRoom room) {
+    if (room.destinationPoint == null) return;
+    final destPt = room.destinationPoint!;
+    final alreadyMatches = destination != null &&
+        (destination!.point.latitude - destPt.latitude).abs() < 0.0001 &&
+        (destination!.point.longitude - destPt.longitude).abs() < 0.0001;
+    if (!alreadyMatches) {
+      chooseDestination(Place(
+        id: 'convoy_${room.code}',
+        name: room.destinationName?.isNotEmpty == true ? room.destinationName! : 'Convoy Destination',
+        nameAr: room.destinationName?.isNotEmpty == true ? room.destinationName! : 'وجهة الشلّة',
+        subtitle: 'Live Convoy Destination',
+        subtitleAr: 'وجهة الموكب المشتركة',
+        point: destPt,
+        category: PlaceCategory.landmark,
+      ));
+    }
+  }
+
+  Future<LiveRoom?> joinLiveRoom(String code, {String? displayName}) async {
+    if (displayName != null && displayName.trim().isNotEmpty) {
+      await setUserDisplayName(displayName);
+    }
+    final memberName = (userDisplayName != null && userDisplayName!.isNotEmpty)
+        ? userDisplayName!
+        : (arabic ? 'صديق' : 'Friend');
+    final cleanCode = code.trim().toUpperCase();
+    final room = await _api.pingLiveRoom(
+      code: cleanCode,
+      memberId: _sessionId,
+      displayName: memberName,
+      point: position,
+      speedKmh: speedKph,
+      heading: heading,
+      distanceToDestMeters: progress?.remainingMeters,
+      etaSeconds: progress?.remainingSeconds,
+    );
+    if (room != null && room.isActive && !room.isExpired) {
+      activeLiveRoom = room;
+      _startLiveRoomPingTimer();
+      if (room.destinationPoint != null && room.creatorId != _sessionId) {
+        _syncRoomDestination(room);
+      }
+      _emit();
+      return room;
+    }
+    return null;
+  }
+
+  Future<void> leaveLiveRoom() async {
+    final room = activeLiveRoom;
+    if (room != null) {
+      _liveRoomTimer?.cancel();
+      _liveRoomTimer = null;
+      activeLiveRoom = null;
+      _emit();
+      await _api.leaveLiveRoom(code: room.code, memberId: _sessionId);
+    }
+  }
+
+  Future<void> endLiveRoom() async {
+    final room = activeLiveRoom;
+    if (room != null) {
+      _liveRoomTimer?.cancel();
+      _liveRoomTimer = null;
+      activeLiveRoom = null;
+      _emit();
+      await _api.endLiveRoom(code: room.code, requesterId: _sessionId);
+    }
+  }
+
+  void _startLiveRoomPingTimer() {
+    _liveRoomTimer?.cancel();
+    _liveRoomTimer = Timer.periodic(const Duration(seconds: 4), (_) {
+      _pingLiveRoom();
+    });
+  }
+
+  Future<void> _pingLiveRoom() async {
+    final room = activeLiveRoom;
+    if (room == null || !room.isActive || room.isExpired) {
+      _liveRoomTimer?.cancel();
+      _liveRoomTimer = null;
+      if (activeLiveRoom != null) {
+        activeLiveRoom = null;
+        _emit();
+      }
+      return;
+    }
+
+    final updated = await _api.pingLiveRoom(
+      code: room.code,
+      memberId: _sessionId,
+      displayName: userDisplayName,
+      point: position,
+      speedKmh: speedKph,
+      heading: heading,
+      distanceToDestMeters: progress?.remainingMeters,
+      etaSeconds: progress?.remainingSeconds,
+    );
+
+    if (updated != null) {
+      if (!updated.isActive || updated.isExpired) {
+        _liveRoomTimer?.cancel();
+        _liveRoomTimer = null;
+        activeLiveRoom = null;
+      } else {
+        activeLiveRoom = updated;
+        if (updated.destinationPoint != null && updated.creatorId != _sessionId) {
+          _syncRoomDestination(updated);
+        }
+      }
+      _emit();
+    }
+  }
+
+  Future<bool> openAndroidAutoSettings() async {
+    try {
+      const channel = MethodChannel('app.darb.darb/device');
+      final res = await channel.invokeMethod<bool>('openAndroidAutoSettings');
+      return res ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
 
   @override
   void dispose() {
     _disposed = true; _routeRequest++; _searchRequest++;
+    _liveRoomTimer?.cancel();
     _serverIncidentsTimer?.cancel();
     _updateCheckTimer?.cancel();
     _simulation?.cancel(); _expiry?.cancel(); _gps?.cancel(); _reportStream?.cancel();

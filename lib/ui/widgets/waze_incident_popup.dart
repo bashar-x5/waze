@@ -27,9 +27,20 @@ class WazeIncidentPopup extends StatelessWidget {
     final title = WazeColors.reportTitle(report.type, arabic);
 
     final diff = DateTime.now().difference(report.createdAt).inMinutes;
-    final timeAgo = diff <= 0
-        ? (arabic ? 'الآن' : 'Just now')
-        : (arabic ? 'منذ $diff دقيقة' : '$diff min ago');
+    final String timeAgo;
+    if (diff <= 0) {
+      timeAgo = arabic ? 'الآن' : 'Just now';
+    } else if (diff >= 60) {
+      final h = diff ~/ 60;
+      final m = diff % 60;
+      if (m > 0) {
+        timeAgo = arabic ? 'منذ $h س $m د' : '${h}h ${m}min ago';
+      } else {
+        timeAgo = arabic ? 'منذ $h س' : '${h}h ago';
+      }
+    } else {
+      timeAgo = arabic ? 'منذ $diff دقيقة' : '$diff min ago';
+    }
 
     return Container(
       decoration: BoxDecoration(

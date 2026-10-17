@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../domain/models.dart';
 import '../waze_theme.dart';
@@ -20,14 +21,7 @@ class WazeReportSheet extends StatefulWidget {
 
 class _WazeReportSheetState extends State<WazeReportSheet> {
   ReportType? _selectedType;
-  final TextEditingController _textController = TextEditingController();
   bool _submitting = false;
-
-  @override
-  void dispose() {
-    _textController.dispose();
-    super.dispose();
-  }
 
   void _onPick(ReportType type) {
     setState(() {
@@ -38,7 +32,8 @@ class _WazeReportSheetState extends State<WazeReportSheet> {
   Future<void> _send() async {
     if (_selectedType == null || _submitting) return;
     setState(() => _submitting = true);
-    await widget.onSubmit(_selectedType!, _textController.text.trim());
+    final desc = WazeColors.reportTitle(_selectedType!, widget.arabic);
+    await widget.onSubmit(_selectedType!, desc);
     if (mounted) {
       Navigator.of(context).pop();
     }
@@ -50,6 +45,10 @@ class _WazeReportSheetState extends State<WazeReportSheet> {
     final arabic = widget.arabic;
     final bg = dark ? WazeColors.darkSurface : Colors.white;
     final textColor = dark ? Colors.white : Colors.black87;
+
+    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+    final bottomPadding = MediaQuery.paddingOf(context).bottom;
+    final effectiveBottom = bottomInset + math.max(bottomPadding, 16.0) + 14.0;
 
     return Container(
       decoration: BoxDecoration(
@@ -63,190 +62,214 @@ class _WazeReportSheetState extends State<WazeReportSheet> {
           ),
         ],
       ),
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
+      padding: EdgeInsets.fromLTRB(20, 12, 20, effectiveBottom),
       child: SafeArea(
         top: false,
+        bottom: true,
         child: SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
           child: Column(
             mainAxisSize: MainAxisSize.min,
-          children: [
-            // Handle bar
-            Container(
-              width: 44,
-              height: 5,
-              decoration: BoxDecoration(
-                color: dark ? Colors.white24 : Colors.black12,
-                borderRadius: BorderRadius.circular(3),
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Handle bar
+              Center(
+                child: Container(
+                  width: 44,
+                  height: 5,
+                  decoration: BoxDecoration(
+                    color: dark ? Colors.white24 : Colors.black12,
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                ),
               ),
-            ),
-            const SizedBox(height: 16),
+              const SizedBox(height: 14),
 
-            // Header
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: const BoxDecoration(
-                    color: WazeColors.orange,
-                    shape: BoxShape.circle,
+              // Header
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: const BoxDecoration(
+                      color: WazeColors.orange,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.campaign_rounded,
+                      color: Colors.white,
+                      size: 20,
+                    ),
                   ),
-                  child: const Icon(
-                    Icons.campaign_rounded,
-                    color: Colors.white,
-                    size: 22,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        arabic ? 'شارك بلاغاً مع السائقين' : 'Share a Road Alert',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w800,
-                          color: textColor,
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          arabic ? 'شارك بلاغاً مع السائقين' : 'Share a Road Alert',
+                          style: TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w800,
+                            color: textColor,
+                          ),
                         ),
-                      ),
-                      Text(
-                        arabic
-                            ? 'ساعد المجتمع بمعرفة حالة الطريق فوراً'
-                            : 'Help other Wazers know real-time conditions',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: dark ? Colors.white60 : Colors.black54,
+                        Text(
+                          arabic
+                              ? 'اختر نوع البلاغ واضغط إرسال فوراً'
+                              : 'Select alert type and tap send immediately',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: dark ? Colors.white60 : Colors.black54,
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-                IconButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  icon: Icon(
-                    Icons.close,
-                    color: dark ? Colors.white54 : Colors.black45,
+                  IconButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: Icon(
+                      Icons.close,
+                      color: dark ? Colors.white54 : Colors.black45,
+                    ),
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 18),
+                ],
+              ),
+              const SizedBox(height: 14),
 
-            if (_selectedType == null) ...[
               // Grid of 9 Waze Report Types
               GridView.count(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
                 crossAxisCount: 3,
-                mainAxisSpacing: 14,
-                crossAxisSpacing: 12,
-                childAspectRatio: 0.95,
+                mainAxisSpacing: 8,
+                crossAxisSpacing: 8,
+                mainAxisExtent: 84,
                 children: ReportType.values.map((type) {
                   final color = WazeColors.reportColor(type);
                   final icon = WazeColors.reportIcon(type);
                   final title = WazeColors.reportTitle(type, arabic);
+                  final isSelected = _selectedType == type;
 
                   return InkWell(
-                    onTap: () => _onPick(type),
+                    onTap: () {
+                      if (_selectedType == type) {
+                        // Second tap triggers instant send
+                        _send();
+                      } else {
+                        _onPick(type);
+                      }
+                    },
                     borderRadius: BorderRadius.circular(16),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Container(
-                          width: 52,
-                          height: 52,
-                          decoration: BoxDecoration(
-                            color: color.withValues(alpha: 0.15),
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: color.withValues(alpha: 0.4),
-                              width: 2,
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 180),
+                      decoration: BoxDecoration(
+                        color: isSelected
+                            ? color.withValues(alpha: dark ? 0.22 : 0.15)
+                            : (dark
+                                ? Colors.white.withValues(alpha: 0.04)
+                                : Colors.black.withValues(alpha: 0.02)),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: isSelected
+                              ? color
+                              : (dark ? Colors.white12 : Colors.black12),
+                          width: isSelected ? 2.5 : 1.0,
+                        ),
+                        boxShadow: isSelected
+                            ? [
+                                BoxShadow(
+                                  color: color.withValues(alpha: 0.35),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 2),
+                                )
+                              ]
+                            : null,
+                      ),
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          if (isSelected)
+                            Positioned(
+                              top: 5,
+                              right: 5,
+                              child: Container(
+                                padding: const EdgeInsets.all(2),
+                                decoration: BoxDecoration(
+                                  color: color,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(
+                                  Icons.check,
+                                  color: Colors.white,
+                                  size: 11,
+                                ),
+                              ),
                             ),
+                          Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Container(
+                                width: 38,
+                                height: 38,
+                                decoration: BoxDecoration(
+                                  color: color.withValues(
+                                      alpha: isSelected ? 0.25 : 0.14),
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: color.withValues(
+                                        alpha: isSelected ? 0.95 : 0.4),
+                                    width: 1.5,
+                                  ),
+                                ),
+                                child: Center(
+                                  child: Icon(icon, color: color, size: 20),
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 4),
+                                child: Text(
+                                  title,
+                                  textAlign: TextAlign.center,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: isSelected
+                                        ? FontWeight.w800
+                                        : FontWeight.w600,
+                                    color: isSelected
+                                        ? (dark ? Colors.white : color)
+                                        : textColor,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
-                          child: Center(
-                            child: Icon(icon, color: color, size: 26),
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          title,
-                          textAlign: TextAlign.center,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            color: textColor,
-                          ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   );
                 }).toList(),
               ),
-            ] else ...[
-              // Detail / Comment entry for selected report
-              Row(
-                children: [
-                  Container(
-                    width: 48,
-                    height: 48,
-                    decoration: BoxDecoration(
-                      color: WazeColors.reportColor(_selectedType!),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      WazeColors.reportIcon(_selectedType!),
-                      color: Colors.white,
-                      size: 26,
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Text(
-                      WazeColors.reportTitle(_selectedType!, arabic),
-                      style: TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.bold,
-                        color: textColor,
-                      ),
-                    ),
-                  ),
-                  TextButton(
-                    onPressed: () => setState(() => _selectedType = null),
-                    child: Text(arabic ? 'تغيير' : 'Change'),
-                  ),
-                ],
-              ),
               const SizedBox(height: 14),
-              TextField(
-                controller: _textController,
-                autofocus: true,
-                style: TextStyle(color: textColor),
-                decoration: InputDecoration(
-                  hintText: arabic
-                      ? 'ملاحظة إضافية (اختياري، مثلاً: في المسار الأيمن)'
-                      : 'Add comment (optional, e.g. right lane blocked)',
-                  hintStyle: TextStyle(
-                    color: dark ? Colors.white38 : Colors.black38,
-                    fontSize: 13,
-                  ),
-                  filled: true,
-                  fillColor: dark ? WazeColors.darkCard : const Color(0xFFF0F3F6),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide.none,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 20),
+
+              // Safe Area Submit Button
               SizedBox(
                 width: double.infinity,
-                height: 52,
+                height: 50,
                 child: FilledButton(
-                  onPressed: _submitting ? null : _send,
+                  onPressed: (_selectedType == null || _submitting) ? null : _send,
                   style: FilledButton.styleFrom(
-                    backgroundColor: WazeColors.orange,
+                    backgroundColor: _selectedType != null
+                        ? WazeColors.reportColor(_selectedType!)
+                        : (dark ? Colors.white12 : Colors.black12),
+                    foregroundColor: Colors.white,
+                    disabledBackgroundColor:
+                        dark ? Colors.white10 : Colors.black12,
+                    disabledForegroundColor:
+                        dark ? Colors.white38 : Colors.black38,
+                    elevation: _selectedType != null ? 3 : 0,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16),
                     ),
@@ -260,20 +283,37 @@ class _WazeReportSheetState extends State<WazeReportSheet> {
                             color: Colors.white,
                           ),
                         )
-                      : Text(
-                          arabic ? 'إرسال البلاغ الآن' : 'Send Alert Now',
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
+                      : Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            if (_selectedType != null) ...[
+                              Icon(
+                                WazeColors.reportIcon(_selectedType!),
+                                size: 20,
+                                color: Colors.white,
+                              ),
+                              const SizedBox(width: 8),
+                            ],
+                            Text(
+                              _selectedType == null
+                                  ? (arabic
+                                      ? 'اختر نوع البلاغ أعلاه'
+                                      : 'Select Alert Type Above')
+                                  : (arabic
+                                      ? 'إرسال البلاغ الآن'
+                                      : 'Send Alert Now'),
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
                         ),
                 ),
               ),
             ],
-          ],
+          ),
         ),
-      ),
       ),
     );
   }

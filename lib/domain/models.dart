@@ -322,3 +322,143 @@ class ParkedCarLocation {
     note: json['note'] as String?,
   );
 }
+
+class LiveRoomMember {
+  const LiveRoomMember({
+    required this.memberId,
+    required this.displayName,
+    this.avatarColor = '#00E676',
+    required this.point,
+    this.speedKmh = 0.0,
+    this.heading,
+    this.batteryPercent,
+    required this.updatedAt,
+    this.isCreator = false,
+    this.distanceToDestMeters,
+    this.etaSeconds,
+  });
+
+  final String memberId;
+  final String displayName;
+  final String avatarColor;
+  final LatLng point;
+  final double speedKmh;
+  final double? heading;
+  final int? batteryPercent;
+  final DateTime updatedAt;
+  final bool isCreator;
+  final double? distanceToDestMeters;
+  final double? etaSeconds;
+
+  bool get isOnline => DateTime.now().toUtc().difference(updatedAt).inSeconds <= 30;
+
+  Map<String, dynamic> toJson() => {
+    'memberId': memberId,
+    'displayName': displayName,
+    'avatarColor': avatarColor,
+    'latitude': point.latitude,
+    'longitude': point.longitude,
+    'speedKmh': speedKmh,
+    if (heading != null) 'heading': heading,
+    if (batteryPercent != null) 'batteryPercent': batteryPercent,
+    'updatedAt': updatedAt.toIso8601String(),
+    'isCreator': isCreator,
+    if (distanceToDestMeters != null) 'distanceToDestMeters': distanceToDestMeters,
+    if (etaSeconds != null) 'etaSeconds': etaSeconds,
+  };
+
+  factory LiveRoomMember.fromJson(Map<String, dynamic> json) => LiveRoomMember(
+    memberId: (json['memberId'] ?? json['member_id'] ?? '') as String,
+    displayName: (json['displayName'] ?? json['display_name'] ?? 'عضو') as String,
+    avatarColor: (json['avatarColor'] ?? json['avatar_color'] ?? '#00E676') as String,
+    point: _pointFromJson(json),
+    speedKmh: ((json['speedKmh'] ?? json['speed_kmh'] ?? 0) as num).toDouble(),
+    heading: (json['heading'] as num?)?.toDouble(),
+    batteryPercent: (json['batteryPercent'] ?? json['battery_percent'] as num?)?.toInt(),
+    updatedAt: DateTime.tryParse(json['updatedAt']?.toString() ?? '') ?? DateTime.now().toUtc(),
+    isCreator: (json['isCreator'] ?? json['is_creator'] ?? false) as bool,
+    distanceToDestMeters: (json['distanceToDestMeters'] as num?)?.toDouble(),
+    etaSeconds: (json['etaSeconds'] as num?)?.toDouble(),
+  );
+}
+
+class LiveRoom {
+  const LiveRoom({
+    required this.code,
+    required this.name,
+    this.mode = 'convoy',
+    required this.creatorId,
+    required this.creatorName,
+    required this.createdAt,
+    required this.expiresAt,
+    this.isActive = true,
+    this.destinationName,
+    this.destinationPoint,
+    required this.shareUrl,
+    this.members = const [],
+  });
+
+  final String code;
+  final String name;
+  final String mode;
+  final String creatorId;
+  final String creatorName;
+  final DateTime createdAt;
+  final DateTime expiresAt;
+  final bool isActive;
+  final String? destinationName;
+  final LatLng? destinationPoint;
+  final String shareUrl;
+  final List<LiveRoomMember> members;
+
+  int get remainingSeconds =>
+      expiresAt.difference(DateTime.now().toUtc()).inSeconds.clamp(0, 86400);
+
+  bool get isExpired => remainingSeconds <= 0;
+
+  Map<String, dynamic> toJson() => {
+    'code': code,
+    'name': name,
+    'mode': mode,
+    'creatorId': creatorId,
+    'creatorName': creatorName,
+    'createdAt': createdAt.toIso8601String(),
+    'expiresAt': expiresAt.toIso8601String(),
+    'isActive': isActive,
+    if (destinationName != null) 'destinationName': destinationName,
+    if (destinationPoint != null) ...{
+      'destinationLat': destinationPoint!.latitude,
+      'destinationLon': destinationPoint!.longitude,
+    },
+    'shareUrl': shareUrl,
+    'members': members.map((m) => m.toJson()).toList(),
+  };
+
+  factory LiveRoom.fromJson(Map<String, dynamic> json) {
+    LatLng? dest;
+    final lat = json['destinationLat'] ?? json['destination_lat'];
+    final lon = json['destinationLon'] ?? json['destination_lon'];
+    if (lat is num && lon is num) {
+      dest = LatLng(lat.toDouble(), lon.toDouble());
+    }
+
+    final rawMembers = json['members'] as List<dynamic>? ?? [];
+    return LiveRoom(
+      code: (json['code'] ?? '').toString().toUpperCase(),
+      name: (json['name'] ?? 'غرفة درب').toString(),
+      mode: (json['mode'] ?? 'convoy').toString(),
+      creatorId: (json['creatorId'] ?? json['creator_id'] ?? '').toString(),
+      creatorName: (json['creatorName'] ?? json['creator_name'] ?? '').toString(),
+      createdAt: DateTime.tryParse(json['createdAt']?.toString() ?? '') ?? DateTime.now().toUtc(),
+      expiresAt: DateTime.tryParse(json['expiresAt']?.toString() ?? '') ?? DateTime.now().toUtc().add(const Duration(hours: 2)),
+      isActive: (json['isActive'] ?? json['is_active'] ?? true) as bool,
+      destinationName: json['destinationName']?.toString(),
+      destinationPoint: dest,
+      shareUrl: (json['shareUrl'] ?? json['share_url'] ?? '').toString(),
+      members: rawMembers
+          .map((m) => LiveRoomMember.fromJson(Map<String, dynamic>.from(m as Map)))
+          .toList(),
+    );
+  }
+}
+

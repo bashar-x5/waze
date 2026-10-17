@@ -12,6 +12,7 @@ class NavigationProgress {
     required this.distanceFromRouteMeters,
     required this.stepIndex,
     required this.arrived,
+    this.stepRemainingMeters,
     this.snappedPoint,
     this.segmentBearing,
     this.headingDivergence,
@@ -23,6 +24,7 @@ class NavigationProgress {
   final double distanceFromRouteMeters;
   final int stepIndex;
   final bool arrived;
+  final double? stepRemainingMeters;
   final LatLng? snappedPoint;
   final double? segmentBearing;
   final double? headingDivergence;
@@ -71,6 +73,7 @@ NavigationProgress calculateProgress(
         route.points.isNotEmpty && totalMeters <= 30 && distance <= 25;
     final traveled = arrived ? totalMeters : previous;
     final remaining = math.max(0.0, totalMeters - traveled);
+    final stepIdx = arrived ? math.max(0, route.steps.length - 1) : 0;
     return NavigationProgress(
       traveledMeters: traveled,
       remainingMeters: remaining,
@@ -78,7 +81,8 @@ NavigationProgress calculateProgress(
           ? durationSeconds * remaining / totalMeters
           : 0,
       distanceFromRouteMeters: distance,
-      stepIndex: arrived ? math.max(0, route.steps.length - 1) : 0,
+      stepIndex: stepIdx,
+      stepRemainingMeters: _stepRemainingAt(route, traveled, stepIdx),
       arrived: arrived,
     );
   }
@@ -121,18 +125,33 @@ NavigationProgress calculateProgress(
   // Only snap vehicle if heading is roughly aligned (<= 50°) or if vehicle is stationary/heading unknown
   final allowSnap = headingDivergence == null || headingDivergence <= 50;
   final snapped = (matched.distance <= 45 && allowSnap) ? matched.snapped : null;
+  final stepIdx = _stepAt(route, traveled, arrived);
 
   return NavigationProgress(
     traveledMeters: traveled,
     remainingMeters: remaining,
     remainingSeconds: durationSeconds * remaining / totalMeters,
     distanceFromRouteMeters: matched.distance,
-    stepIndex: _stepAt(route, traveled, arrived),
+    stepIndex: stepIdx,
+    stepRemainingMeters: _stepRemainingAt(route, traveled, stepIdx),
     arrived: arrived,
     snappedPoint: snapped,
     segmentBearing: matched.segmentBearing,
     headingDivergence: headingDivergence,
   );
+}
+
+double _stepRemainingAt(DriveRoute route, double traveled, int stepIndex) {
+  if (route.steps.isEmpty) return 0.0;
+  if (stepIndex >= route.steps.length - 1) {
+    return math.max(0.0, route.distanceMeters - traveled);
+  }
+  var cumulative = 0.0;
+  for (var index = 0; index <= stepIndex && index < route.steps.length; index++) {
+    final distance = route.steps[index].distanceMeters;
+    if (distance.isFinite && distance > 0) cumulative += distance;
+  }
+  return math.max(0.0, cumulative - traveled);
 }
 
 int _stepAt(DriveRoute route, double traveled, bool arrived) {

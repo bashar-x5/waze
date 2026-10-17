@@ -131,5 +131,85 @@ void main() {
 
       service.dispose();
     });
+
+    test('Live Room API endpoints create, fetch (case-insensitive) and ping correctly', () async {
+      final mockRoomJson = jsonEncode({
+        'code': 'K9X2B4',
+        'name': 'طلعة الشباب',
+        'mode': 'convoy',
+        'creatorId': 'user_1',
+        'creatorName': 'أحمد',
+        'createdAt': DateTime.now().toUtc().toIso8601String(),
+        'expiresAt': DateTime.now().toUtc().add(const Duration(hours: 2)).toIso8601String(),
+        'isActive': true,
+        'shareUrl': 'http://localhost:5000/track/K9X2B4',
+        'members': [
+          {
+            'memberId': 'user_1',
+            'displayName': 'أحمد',
+            'avatarColor': '#00E676',
+            'latitude': 33.3152,
+            'longitude': 44.3661,
+            'speedKmh': 45.0,
+            'updatedAt': DateTime.now().toUtc().toIso8601String(),
+            'isCreator': true,
+          }
+        ]
+      });
+
+      final client = MockClient((request) async {
+        if (request.method == 'POST' && request.url.path == '/api/rooms') {
+          return http.Response.bytes(utf8.encode(mockRoomJson), 200);
+        }
+        if (request.method == 'GET' && request.url.path == '/api/rooms/K9X2B4') {
+          return http.Response.bytes(utf8.encode(mockRoomJson), 200);
+        }
+        if (request.method == 'POST' && request.url.path == '/api/rooms/K9X2B4/ping') {
+          return http.Response.bytes(utf8.encode(mockRoomJson), 200);
+        }
+        if (request.method == 'POST' && request.url.path == '/api/rooms/K9X2B4/destination') {
+          return http.Response.bytes(utf8.encode(mockRoomJson), 200);
+        }
+        return http.Response('Not found', 404);
+      });
+
+      final service = DarbApiService(client: client, baseUrl: 'http://localhost:5000');
+
+      final created = await service.createLiveRoom(
+        name: 'طلعة الشباب',
+        creatorId: 'user_1',
+        creatorName: 'أحمد',
+        point: const LatLng(33.3152, 44.3661),
+      );
+      expect(created, isNotNull);
+      expect(created!.code, 'K9X2B4');
+      expect(created.members.length, 1);
+      expect(created.members.first.displayName, 'أحمد');
+
+      // Test lowercase code query is normalized
+      final fetched = await service.fetchLiveRoom('k9x2b4');
+      expect(fetched, isNotNull);
+      expect(fetched!.code, 'K9X2B4');
+
+      final pinged = await service.pingLiveRoom(
+        code: 'k9x2b4',
+        memberId: 'user_1',
+        point: const LatLng(33.3152, 44.3661),
+        speedKmh: 50.0,
+      );
+      expect(pinged, isNotNull);
+      expect(pinged!.code, 'K9X2B4');
+
+      final destUpdated = await service.setLiveRoomDestination(
+        code: 'k9x2b4',
+        requesterId: 'user_1',
+        destinationName: 'المنصور مول',
+        destinationPoint: const LatLng(33.314, 44.354),
+      );
+      expect(destUpdated, isNotNull);
+      expect(destUpdated!.code, 'K9X2B4');
+
+      service.dispose();
+    });
   });
 }

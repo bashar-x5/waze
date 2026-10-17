@@ -6,9 +6,12 @@ import androidx.car.app.model.Action
 import androidx.car.app.model.ActionStrip
 import androidx.car.app.model.Distance
 import androidx.car.app.model.ItemList
+import androidx.car.app.model.MessageTemplate
 import androidx.car.app.model.PlaceListMapTemplate
 import androidx.car.app.model.Row
 import androidx.car.app.model.Template
+import androidx.car.app.navigation.NavigationManager
+import androidx.car.app.navigation.NavigationManagerCallback
 import androidx.car.app.navigation.model.Maneuver
 import androidx.car.app.navigation.model.NavigationTemplate
 import androidx.car.app.navigation.model.RoutingInfo
@@ -18,17 +21,46 @@ import androidx.lifecycle.LifecycleEventObserver
 
 class DarbCarScreen(carContext: CarContext) : Screen(carContext), CarBridge.StateListener {
 
+    private val navManager: NavigationManager? = try {
+        carContext.getCarService(NavigationManager::class.java)
+    } catch (_: Exception) {
+        null
+    }
+
+    private var isNavigatingRegistered = false
+
     init {
         CarBridge.addStateListener(this)
+
+        try {
+            navManager?.setNavigationManagerCallback(object : NavigationManagerCallback {
+                override fun onStopNavigation() {
+                    CarBridge.notifyStopNavigation()
+                }
+                override fun onAutoDriveEnabled() {}
+            })
+        } catch (_: Exception) {}
 
         lifecycle.addObserver(LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_DESTROY) {
                 CarBridge.removeStateListener(this)
+                try {
+                    navManager?.clearNavigationManagerCallback()
+                } catch (_: Exception) {}
             }
         })
     }
 
     override fun onStateChanged(state: CarNavState) {
+        try {
+            if (state.isNavigating && !isNavigatingRegistered) {
+                navManager?.navigationStarted()
+                isNavigatingRegistered = true
+            } else if (!state.isNavigating && isNavigatingRegistered) {
+                navManager?.navigationEnded()
+                isNavigatingRegistered = false
+            }
+        } catch (_: Exception) {}
         invalidate()
     }
 
@@ -103,67 +135,83 @@ class DarbCarScreen(carContext: CarContext) : Screen(carContext), CarBridge.Stat
                 .setNavigationInfo(routingInfo)
                 .build()
         } catch (e: Exception) {
-            // Graceful fallback to place list if template construction encounters host constraints
+            // Graceful fallback to idle template if template construction encounters host constraints
             return buildIdleTemplate()
         }
     }
 
     private fun buildIdleTemplate(): Template {
-        val listBuilder = ItemList.Builder()
-        val places = CarBridge.savedPlaces
+        try {
+            val listBuilder = ItemList.Builder()
+            val places = CarBridge.savedPlaces
 
-        // Prominent 1-tap voice search row directly in the car list
-        val voiceRow = Row.Builder()
-            .setTitle("🎤 بحث صوتي / Voice Navigation")
-            .addText("قل: 'اريد الذهاب لساحة الفردوس'")
-            .setOnClickListener {
-                screenManager.push(DarbCarSearchScreen(carContext))
-            }
-            .build()
-        listBuilder.addItem(voiceRow)
+            // Prominent 1-tap voice search row directly in the car list
+            val voiceRow = Row.Builder()
+                .setTitle("🎤 بحث صوتي / Voice Navigation")
+                .addText("قل: 'اريد الذهاب لساحة الفردوس'")
+                .setOnClickListener {
+                    screenManager.push(DarbCarSearchScreen(carContext))
+                }
+                .build()
+            listBuilder.addItem(voiceRow)
 
-        if (places.isEmpty()) {
-            listBuilder.addItem(
-                Row.Builder()
-                    .setTitle("درب - جاهز للملاحة")
-                    .addText("اختر وجهتك بالصوت أو من الهاتف")
-                    .build()
-            )
-        } else {
-            for (place in places.take(5)) {
-                val rowBuilder = Row.Builder()
-                    .setTitle(place.title)
-                    .addText(place.subtitle)
-                    .setOnClickListener {
-                        CarBridge.notifyDestinationSelected(place.id, place.lat, place.lon)
-                    }
-                listBuilder.addItem(rowBuilder.build())
+            if (places.isEmpty()) {
+                listBuilder.addItem(
+                    Row.Builder()
+                        .setTitle("درب - جاهز للملاحة")
+                        .addText("اختر وجهتك بالصوت أو من الهاتف")
+                        .build()
+                )
+            } else {
+                for (place in places.take(5)) {
+                    val rowBuilder = Row.Builder()
+                        .setTitle(place.title)
+                        .addText(place.subtitle)
+                        .setOnClickListener {
+                            CarBridge.notifyDestinationSelected(place.id, place.lat, place.lon)
+                        }
+                    listBuilder.addItem(rowBuilder.build())
+                }
             }
+
+            val voiceAction = Action.Builder()
+                .setTitle("صوتي / Voice")
+                .setOnClickListener {
+                    screenManager.push(DarbCarSearchScreen(carContext))
+                }
+                .build()
+
+            val refreshAction = Action.Builder()
+                .setTitle("تحديث / Refresh")
+                .setOnClickListener {
+                    invalidate()
+                }
+                .build()
+
+            val actionStrip = ActionStrip.Builder()
+                .addAction(voiceAction)
+                .addAction(refreshAction)
+                .build()
+
+            return PlaceListMapTemplate.Builder()
+                .setTitle("درب - Darb")
+                .setHeaderAction(Action.APP_ICON)
+                .setItemList(listBuilder.build())
+                .setActionStrip(actionStrip)
+                .build()
+        } catch (e: Exception) {
+            return MessageTemplate.Builder("درب - Darb جاهز للملاحة")
+                .setHeaderAction(Action.APP_ICON)
+                .addAction(
+                    Action.Builder()
+                        .setTitle("بحث صوتي / Voice")
+                        .setOnClickListener {
+                            screenManager.push(DarbCarSearchScreen(carContext))
+                        }
+                        .build()
+                )
+                .build()
         }
-
-        val voiceAction = Action.Builder()
-            .setTitle("صوتي / Voice")
-            .setOnClickListener {
-                screenManager.push(DarbCarSearchScreen(carContext))
-            }
-            .build()
-
-        val refreshAction = Action.Builder()
-            .setTitle("تحديث / Refresh")
-            .setOnClickListener {
-                invalidate()
-            }
-            .build()
-
-        val actionStrip = ActionStrip.Builder()
-            .addAction(voiceAction)
-            .addAction(refreshAction)
-            .build()
-
-        return PlaceListMapTemplate.Builder()
-            .setTitle("درب - Darb")
-            .setItemList(listBuilder.build())
-            .setActionStrip(actionStrip)
-            .build()
     }
 }
+

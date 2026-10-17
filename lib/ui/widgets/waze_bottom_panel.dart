@@ -4,6 +4,9 @@ import '../../app/app_controller.dart';
 import '../../domain/models.dart';
 import '../waze_theme.dart';
 import 'waze_saved_locations_modal.dart';
+import 'waze_live_room_sheet.dart';
+import 'waze_developer_sheet.dart';
+import 'waze_android_auto_modal.dart';
 
 class WazeBottomPanel extends StatelessWidget {
   const WazeBottomPanel({
@@ -13,6 +16,10 @@ class WazeBottomPanel extends StatelessWidget {
     required this.onTapSettings,
     required this.onTapAddStop,
     this.onTapVoice,
+    this.onOpenLiveRoom,
+    this.onFitTrack,
+    this.isMinimized = false,
+    this.onMinimizedChanged,
   });
 
   final AppController controller;
@@ -20,6 +27,10 @@ class WazeBottomPanel extends StatelessWidget {
   final VoidCallback onTapSettings;
   final VoidCallback onTapAddStop;
   final VoidCallback? onTapVoice;
+  final VoidCallback? onOpenLiveRoom;
+  final VoidCallback? onFitTrack;
+  final bool isMinimized;
+  final ValueChanged<bool>? onMinimizedChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -47,7 +58,89 @@ class WazeBottomPanel extends StatelessWidget {
               ? _buildNavigatingState(context, c)
               : (c.destination != null
                   ? _buildRoutePreviewState(context, c)
-                  : _buildIdleState(context, c)),
+                  : (isMinimized
+                      ? _buildMinimizedIdleState(context, c)
+                      : _buildIdleState(context, c))),
+        ),
+      ),
+    );
+  }
+
+  // -------------------------------------------------------------
+  // 0. Minimized Bar State (Map maximization)
+  // -------------------------------------------------------------
+  Widget _buildMinimizedIdleState(BuildContext context, AppController c) {
+    final dark = c.dark;
+    final arabic = c.arabic;
+
+    return InkWell(
+      key: const ValueKey('minimized_panel'),
+      onTap: () => onMinimizedChanged?.call(false),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Drag handle with subtle expand indicator
+            Center(
+              child: Container(
+                width: 44,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: dark ? Colors.white38 : Colors.black26,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: dark ? WazeColors.darkCard : const Color(0xFFF0F3F6),
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(
+                  color: dark ? Colors.white12 : Colors.black12,
+                ),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.search_rounded,
+                    color: WazeColors.cyan,
+                    size: 22,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      arabic ? 'إلى أين تريد الذهاب؟' : 'Where to?',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        color: dark ? Colors.white70 : Colors.black87,
+                      ),
+                    ),
+                  ),
+                  if (onTapVoice != null) ...[
+                    IconButton(
+                      icon: const Icon(Icons.mic_rounded, size: 21, color: WazeColors.cyan),
+                      tooltip: arabic ? 'الملاحة الصوتية' : 'Voice Search',
+                      onPressed: onTapVoice,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                    ),
+                    const SizedBox(width: 4),
+                  ],
+                  IconButton(
+                    icon: const Icon(Icons.keyboard_arrow_up_rounded, size: 26, color: WazeColors.cyan),
+                    tooltip: arabic ? 'توسيع القائمة' : 'Expand panel',
+                    onPressed: () => onMinimizedChanged?.call(false),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -63,23 +156,41 @@ class WazeBottomPanel extends StatelessWidget {
 
     return Padding(
       key: const ValueKey('idle_panel'),
-      padding: const EdgeInsets.fromLTRB(18, 12, 18, 16),
+      padding: const EdgeInsets.fromLTRB(18, 10, 18, 16),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Drag handle
+          // Drag handle with tap-to-minimize
           Center(
-            child: Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: dark ? Colors.white24 : Colors.black12,
-                borderRadius: BorderRadius.circular(2),
+            child: InkWell(
+              onTap: () => onMinimizedChanged?.call(true),
+              borderRadius: BorderRadius.circular(12),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 38,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: dark ? Colors.white38 : Colors.black26,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Icon(
+                      Icons.keyboard_arrow_down_rounded,
+                      size: 20,
+                      color: dark ? Colors.white54 : Colors.black45,
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
 
           // Search Bar Input Trigger
           Material(
@@ -109,7 +220,7 @@ class WazeBottomPanel extends StatelessWidget {
                         arabic ? 'إلى أين تريد الذهاب؟' : 'Where to?',
                         style: TextStyle(
                           fontSize: 16,
-                          fontWeight: FontWeight.w700,
+                          fontWeight: FontWeight.w800,
                           color: dark ? Colors.white70 : Colors.black87,
                         ),
                       ),
@@ -140,98 +251,155 @@ class WazeBottomPanel extends StatelessWidget {
           ),
           const SizedBox(height: 14),
 
-          // Quick Action Buttons (Home, Work, Saved, Planned)
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _buildQuickPill(
-                icon: Icons.home_rounded,
-                label: arabic ? 'المنزل' : 'Home',
-                color: const Color(0xFF29B6F6),
-                dark: dark,
-                textColor: textColor,
-                onTap: () {
-                  if (c.home != null) {
-                    c.chooseDestination(c.home!);
-                  } else {
+          // Quick Action Buttons (Home, Work, Saved, Planned, Convoy, Dev, Settings) - Horizontally Scrollable
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            physics: const BouncingScrollPhysics(),
+            padding: const EdgeInsets.symmetric(horizontal: 2),
+            child: Row(
+              children: [
+                _buildQuickPill(
+                  icon: Icons.home_rounded,
+                  label: arabic ? 'المنزل' : 'Home',
+                  color: const Color(0xFF29B6F6),
+                  dark: dark,
+                  textColor: textColor,
+                  onTap: () {
+                    if (c.home != null) {
+                      c.chooseDestination(c.home!);
+                    } else {
+                      showModalBottomSheet<void>(
+                        context: context,
+                        backgroundColor: Colors.transparent,
+                        isScrollControlled: true,
+                        builder: (_) => WazeSavedLocationsModal(
+                          controller: c,
+                          initialRole: SavedPlaceRole.home,
+                        ),
+                      );
+                    }
+                  },
+                ),
+                const SizedBox(width: 8),
+                _buildQuickPill(
+                  icon: Icons.work_rounded,
+                  label: arabic ? 'العمل' : 'Work',
+                  color: const Color(0xFFAB47BC),
+                  dark: dark,
+                  textColor: textColor,
+                  onTap: () {
+                    if (c.work != null) {
+                      c.chooseDestination(c.work!);
+                    } else {
+                      showModalBottomSheet<void>(
+                        context: context,
+                        backgroundColor: Colors.transparent,
+                        isScrollControlled: true,
+                        builder: (_) => WazeSavedLocationsModal(
+                          controller: c,
+                          initialRole: SavedPlaceRole.work,
+                        ),
+                      );
+                    }
+                  },
+                ),
+                const SizedBox(width: 8),
+                _buildQuickPill(
+                  icon: Icons.star_rounded,
+                  label: arabic ? 'المحفوظات' : 'Saved',
+                  color: Colors.amber,
+                  dark: dark,
+                  textColor: textColor,
+                  onTap: () {
                     showModalBottomSheet<void>(
                       context: context,
                       backgroundColor: Colors.transparent,
                       isScrollControlled: true,
                       builder: (_) => WazeSavedLocationsModal(
                         controller: c,
-                        initialRole: SavedPlaceRole.home,
+                        initialRole: SavedPlaceRole.any,
                       ),
                     );
-                  }
-                },
-              ),
-              _buildQuickPill(
-                icon: Icons.work_rounded,
-                label: arabic ? 'العمل' : 'Work',
-                color: const Color(0xFFAB47BC),
-                dark: dark,
-                textColor: textColor,
-                onTap: () {
-                  if (c.work != null) {
-                    c.chooseDestination(c.work!);
-                  } else {
-                    showModalBottomSheet<void>(
-                      context: context,
-                      backgroundColor: Colors.transparent,
-                      isScrollControlled: true,
-                      builder: (_) => WazeSavedLocationsModal(
+                  },
+                ),
+                const SizedBox(width: 8),
+                _buildQuickPill(
+                  icon: Icons.local_parking_rounded,
+                  label: c.parkedLocation != null
+                      ? (arabic ? 'سيارتي' : 'Parked')
+                      : (arabic ? 'ركنت هنا' : 'Park Here'),
+                  color: WazeColors.cyan,
+                  dark: dark,
+                  textColor: textColor,
+                  onTap: () {
+                    if (c.parkedLocation != null) {
+                      c.navigateToParkedCar();
+                    } else {
+                      c.saveParkingLocation();
+                    }
+                  },
+                ),
+                const SizedBox(width: 8),
+                _buildQuickPill(
+                  icon: Icons.groups_rounded,
+                  label: c.activeLiveRoom != null
+                      ? (arabic ? 'شلّة (${c.activeLiveRoom!.code})' : 'Room (${c.activeLiveRoom!.code})')
+                      : (arabic ? 'دَرب شلّة' : 'Convoy'),
+                  color: const Color(0xFF00E676),
+                  dark: dark,
+                  textColor: textColor,
+                  onTap: () {
+                    if (onOpenLiveRoom != null) {
+                      onOpenLiveRoom!();
+                    } else {
+                      WazeLiveRoomSheet.show(
+                        context,
                         controller: c,
-                        initialRole: SavedPlaceRole.work,
-                      ),
-                    );
-                  }
-                },
-              ),
-              _buildQuickPill(
-                icon: Icons.star_rounded,
-                label: arabic ? 'المحفوظات' : 'Saved',
-                color: Colors.amber,
-                dark: dark,
-                textColor: textColor,
-                onTap: () {
-                  showModalBottomSheet<void>(
-                    context: context,
-                    backgroundColor: Colors.transparent,
-                    isScrollControlled: true,
-                    builder: (_) => WazeSavedLocationsModal(
-                      controller: c,
-                      initialRole: SavedPlaceRole.any,
-                    ),
-                  );
-                },
-              ),
-              _buildQuickPill(
-                icon: Icons.local_parking_rounded,
-                label: c.parkedLocation != null
-                    ? (arabic ? 'سيارتي' : 'Parked')
-                    : (arabic ? 'ركنت هنا' : 'Park Here'),
-                color: WazeColors.cyan,
-                dark: dark,
-                textColor: textColor,
-                onTap: () {
-                  if (c.parkedLocation != null) {
-                    c.navigateToParkedCar();
-                  } else {
-                    c.saveParkingLocation();
-                  }
-                },
-              ),
-              _buildQuickPill(
-                icon: Icons.settings_rounded,
-                label: arabic ? 'الإعدادات' : 'Settings',
-                color: const Color(0xFF78909C),
-                dark: dark,
-                textColor: textColor,
-                onTap: onTapSettings,
-              ),
-            ],
+                        onFitTrack: onFitTrack,
+                      );
+                    }
+                  },
+                ),
+                const SizedBox(width: 8),
+                _buildQuickPill(
+                  icon: Icons.person_pin_rounded,
+                  label: arabic ? 'المطور' : 'Developer',
+                  color: const Color(0xFFAB47BC),
+                  dark: dark,
+                  textColor: textColor,
+                  onTap: () {
+                    showWazeDeveloperSheet(context, controller: c);
+                  },
+                ),
+                const SizedBox(width: 8),
+                _buildQuickPill(
+                  icon: Icons.directions_car_filled_rounded,
+                  label: arabic ? 'السيارة' : 'Car Auto',
+                  color: WazeColors.blue,
+                  dark: dark,
+                  textColor: textColor,
+                  onTap: () {
+                    showWazeAndroidAutoModal(context, controller: c);
+                  },
+                ),
+                const SizedBox(width: 8),
+                _buildQuickPill(
+                  icon: Icons.settings_rounded,
+                  label: arabic ? 'الإعدادات' : 'Settings',
+                  color: const Color(0xFF78909C),
+                  dark: dark,
+                  textColor: textColor,
+                  onTap: onTapSettings,
+                ),
+              ],
+            ),
           ),
+
+          // Active Live Room Banner if connected
+          if (c.activeLiveRoom != null) ...[
+            const SizedBox(height: 12),
+            _buildActiveLiveRoomBanner(context, c, dark, textColor, arabic),
+          ],
 
           // Saved Parked Car Card
           if (c.parkedLocation != null) ...[
@@ -434,6 +602,101 @@ class WazeBottomPanel extends StatelessWidget {
     );
   }
 
+  Widget _buildActiveLiveRoomBanner(
+    BuildContext context,
+    AppController c,
+    bool dark,
+    Color textColor,
+    bool arabic,
+  ) {
+    final room = c.activeLiveRoom!;
+    return InkWell(
+      onTap: () {
+        if (onOpenLiveRoom != null) {
+          onOpenLiveRoom!();
+        } else {
+          WazeLiveRoomSheet.show(
+            context,
+            controller: c,
+            onFitTrack: onFitTrack,
+          );
+        }
+      },
+      borderRadius: BorderRadius.circular(18),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: dark ? const Color(0xFF10281E) : const Color(0xFFE8F8F0),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: const Color(0xFF00E676).withValues(alpha: 0.45),
+            width: 1.5,
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: const BoxDecoration(
+                color: Color(0xFF00E676),
+                shape: BoxShape.circle,
+              ),
+              child: const Center(
+                child: Icon(Icons.groups_rounded, color: Colors.black, size: 22),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        room.name,
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w800,
+                          color: textColor,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF00E676).withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          room.code,
+                          style: const TextStyle(
+                            fontFamily: 'monospace',
+                            fontSize: 11,
+                            fontWeight: FontWeight.w900,
+                            color: Color(0xFF00E676),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  Text(
+                    '${room.members.length} ${arabic ? "أصدقاء متصلين • اضغط للعرض والمشاركة" : "members connected • Tap to view"}',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: dark ? Colors.white60 : Colors.black54,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Color(0xFF00E676)),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildQuickPill({
     required IconData icon,
     required String label,
@@ -444,14 +707,15 @@ class WazeBottomPanel extends StatelessWidget {
   }) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(14),
+      borderRadius: BorderRadius.circular(16),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              width: 44,
-              height: 44,
+              width: 48,
+              height: 48,
               decoration: BoxDecoration(
                 color: color.withValues(alpha: 0.15),
                 shape: BoxShape.circle,
@@ -464,8 +728,8 @@ class WazeBottomPanel extends StatelessWidget {
             Text(
               label,
               style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
+                fontSize: 12.5,
+                fontWeight: FontWeight.w800,
                 color: textColor,
               ),
             ),
@@ -702,9 +966,7 @@ class WazeBottomPanel extends StatelessWidget {
                                     child: FittedBox(
                                       fit: BoxFit.scaleDown,
                                       child: Text(
-                                        arabic
-                                            ? '+${((r.totalDurationSeconds - c.routes.first.totalDurationSeconds) / 60).round()} د'
-                                            : '+${((r.totalDurationSeconds - c.routes.first.totalDurationSeconds) / 60).round()} min',
+                                        '+${c.duration(r.totalDurationSeconds - c.routes.first.totalDurationSeconds)}',
                                         style: TextStyle(
                                           fontSize: 9.5,
                                           fontWeight: FontWeight.w600,
@@ -812,8 +1074,8 @@ class WazeBottomPanel extends StatelessWidget {
                     Expanded(
                       child: Text(
                         arabic
-                            ? 'الوقت الإجمالي للمسار: ${c.duration(c.route!.totalDurationSeconds)} (شامل تأخير الازدحام +${(c.route!.trafficDelaySeconds / 60).round()} دقيقة)'
-                            : 'Total route time: ${c.duration(c.route!.totalDurationSeconds)} (includes +${(c.route!.trafficDelaySeconds / 60).round()} min traffic delay)',
+                            ? 'الوقت الإجمالي للمسار: ${c.duration(c.route!.totalDurationSeconds)} (شامل تأخير الازدحام +${c.duration(c.route!.trafficDelaySeconds)})'
+                            : 'Total route time: ${c.duration(c.route!.totalDurationSeconds)} (includes +${c.duration(c.route!.trafficDelaySeconds)} traffic delay)',
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w700,

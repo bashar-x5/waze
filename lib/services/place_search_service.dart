@@ -47,15 +47,15 @@ class PlaceSearchService {
         '${near?.longitude.toStringAsFixed(3)}';
     final cached = _cached(key);
     if (cached != null) return cached;
+    final biasLat = near?.latitude.toStringAsFixed(3) ?? '33.315';
+    final biasLon = near?.longitude.toStringAsFixed(3) ?? '44.366';
     final uri = _base.replace(queryParameters: {
       ..._base.queryParameters,
       'q': text,
       'limit': '12',
-      'countrycode': 'IQ',
-      'bbox': '38.7,29.0,48.7,37.5',
-      if (near != null) 'lat': near.latitude.toStringAsFixed(3),
-      if (near != null) 'lon': near.longitude.toStringAsFixed(3),
-      if (near != null) 'location_bias_scale': '0.2',
+      'lat': biasLat,
+      'lon': biasLon,
+      'location_bias_scale': '0.2',
     });
     return ProviderRequestGate.forUri(uri).run(() async {
       _checkActive();
@@ -100,7 +100,8 @@ class PlaceSearchService {
             // Skip a malformed result; it must not create an invalid map pin.
           }
         }
-        final result = List<Place>.unmodifiable(places.values);
+        final list = List<Place>.from(places.values);
+        final result = List<Place>.unmodifiable(list);
         if (_cache.length >= 60) _cache.remove(_cache.keys.first);
         _cache[key] = _SearchCacheEntry(DateTime.now(), result);
         return result;
@@ -152,13 +153,7 @@ class PlaceSearchService {
     }
     final point = parseProviderCoordinate(geometry['coordinates']);
     final country = _text(properties['countrycode']).toUpperCase();
-    if (country.isNotEmpty && country != 'IQ') return null;
-    if (point.latitude < 29 ||
-        point.latitude > 37.5 ||
-        point.longitude < 38.7 ||
-        point.longitude > 48.7) {
-      return null;
-    }
+    final countryName = _text(properties['country']);
     final extra = properties['extra'] is Map<String, dynamic>
         ? properties['extra'] as Map<String, dynamic>
         : const <String, dynamic>{};
@@ -176,6 +171,7 @@ class PlaceSearchService {
       _text(properties['district']),
       _text(properties['city']),
       _text(properties['state']),
+      countryName,
     ].where((s) => s.isNotEmpty && s != rawName).toSet().join(', ');
     final osmId = properties['osm_id'];
     final osmType = _text(properties['osm_type']);
@@ -196,8 +192,8 @@ class PlaceSearchService {
       id: id,
       name: english,
       nameAr: arabic,
-      subtitle: details.isEmpty ? 'Iraq' : details,
-      subtitleAr: details.isEmpty ? 'العراق' : details,
+      subtitle: details.isEmpty ? (countryName.isNotEmpty ? countryName : (country == 'IQ' ? 'Iraq' : country)) : details,
+      subtitleAr: details.isEmpty ? (countryName.isNotEmpty ? countryName : (country == 'IQ' ? 'العراق' : country)) : details,
       point: point,
       category: category,
     );

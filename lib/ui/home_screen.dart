@@ -18,6 +18,7 @@ import 'widgets/waze_settings_modal.dart';
 import 'widgets/waze_speedometer.dart';
 import 'widgets/waze_voice_search_sheet.dart';
 import 'widgets/waze_permission_sheet.dart';
+import 'widgets/waze_live_room_sheet.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({
@@ -40,6 +41,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   bool _is3D = false;
   bool _wasNavigating = false;
   bool _mapReady = false;
+  bool _bottomPanelMinimized = false;
   Offset? _puckScreenOffset;
 
   late final AnimationController _pulseController;
@@ -377,6 +379,81 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
+  void _openLiveRoomSheet() {
+    WazeLiveRoomSheet.show(
+      context,
+      controller: widget.controller,
+      onFitTrack: _fitConvoyOverview,
+    );
+  }
+
+  void _fitRouteBounds([List<ll.LatLng>? customPoints]) {
+    final c = widget.controller;
+    final List<ll.LatLng> points = customPoints ??
+        (c.route?.points.isNotEmpty == true
+            ? c.route!.points
+            : (c.destination != null ? [c.position, c.destination!.point] : [c.position]));
+    if (points.isEmpty || _mapController == null) return;
+
+    double minLat = points.first.latitude;
+    double maxLat = points.first.latitude;
+    double minLng = points.first.longitude;
+    double maxLng = points.first.longitude;
+
+    for (final p in points) {
+      if (p.latitude < minLat) minLat = p.latitude;
+      if (p.latitude > maxLat) maxLat = p.latitude;
+      if (p.longitude < minLng) minLng = p.longitude;
+      if (p.longitude > maxLng) maxLng = p.longitude;
+    }
+
+    if ((maxLat - minLat).abs() < 0.005) {
+      minLat -= 0.003;
+      maxLat += 0.003;
+    }
+    if ((maxLng - minLng).abs() < 0.005) {
+      minLng -= 0.003;
+      maxLng += 0.003;
+    }
+
+    try {
+      setState(() => _followUser = false);
+      _mapController?.animateCamera(
+        CameraUpdate.newLatLngBounds(
+          LatLngBounds(
+            southwest: LatLng(minLat, minLng),
+            northeast: LatLng(maxLat, maxLng),
+          ),
+          left: 60,
+          right: 60,
+          top: 120,
+          bottom: 340,
+        ),
+      );
+    } catch (e) {
+      debugPrint('Error fitting route bounds: $e');
+    }
+  }
+
+  void _fitConvoyOverview() {
+    final c = widget.controller;
+    final room = c.activeLiveRoom;
+    if (room == null || !room.isActive) {
+      _fitRouteBounds();
+      return;
+    }
+    final List<ll.LatLng> points = [c.position];
+    for (final m in room.members) {
+      points.add(m.point);
+    }
+    if (room.destinationPoint != null) {
+      points.add(room.destinationPoint!);
+    } else if (c.destination != null) {
+      points.add(c.destination!.point);
+    }
+    _fitRouteBounds(points);
+  }
+
 
   void _onMapLongPress(Point<double> point, LatLng coordinates) {
     final arabic = widget.controller.arabic;
@@ -603,6 +680,47 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             circleOpacity: 0.95,
           ),
         );
+      }
+
+      // Render active live room members (Convoy & Family Tracking)
+      if (c.activeLiveRoom != null && c.activeLiveRoom!.isActive) {
+        final destPt = c.activeLiveRoom!.destinationPoint ?? c.destination?.point;
+        for (final member in c.activeLiveRoom!.members) {
+          if (member.memberId == c.userId) continue;
+          final color = member.avatarColor.isNotEmpty ? member.avatarColor : '#00E676';
+
+          // Trajectory track connecting convoy member to shared destination
+          if (destPt != null) {
+            await controller.addLine(
+              LineOptions(
+                geometry: [_toMapLibre(member.point), _toMapLibre(destPt)],
+                lineColor: color,
+                lineWidth: 3.5,
+                lineOpacity: 0.65,
+                lineJoin: 'round',
+              ),
+            );
+          }
+
+          await controller.addCircle(
+            CircleOptions(
+              geometry: _toMapLibre(member.point),
+              circleColor: color,
+              circleRadius: 12.0,
+              circleStrokeColor: '#FFFFFF',
+              circleStrokeWidth: 2.5,
+              circleOpacity: 0.95,
+            ),
+          );
+          await controller.addCircle(
+            CircleOptions(
+              geometry: _toMapLibre(member.point),
+              circleColor: '#FFFFFF',
+              circleRadius: 4.5,
+              circleOpacity: 1.0,
+            ),
+          );
+        }
       }
 
       // Render active road reports and verified speed bump warnings on map
@@ -841,16 +959,16 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               final diffMin = (diffSec / 60).round();
 
               final String label;
-              if (diffMin < 0) {
+              if (diffSec < -30) {
                 label = arabic
-                    ? 'مسار أسرع يوفر ${diffMin.abs()} د'
-                    : 'Faster route saves ${diffMin.abs()} min';
-              } else if (diffMin == 0) {
+                    ? 'مسار أسرع يوفر ${c.duration(diffSec.abs().toDouble())}'
+                    : 'Faster route saves ${c.duration(diffSec.abs().toDouble())}';
+              } else if (diffSec.abs() <= 30) {
                 label = arabic ? 'مسار بديل بنفس الوقت' : 'Alternative route (same ETA)';
               } else {
                 label = arabic
-                    ? 'مسار بديل (+ $diffMin د)'
-                    : 'Alternative route (+ $diffMin min)';
+                    ? 'مسار بديل (+ ${c.duration(diffSec.toDouble())})'
+                    : 'Alternative route (+ ${c.duration(diffSec.toDouble())})';
               }
 
               return Positioned(
@@ -924,8 +1042,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     Expanded(
                       child: Text(
                         arabic
-                            ? 'مسار أسرع يوفر ${((c.route!.totalDurationSeconds - c.routes.first.totalDurationSeconds) / 60).round()} د'
-                            : 'Faster route saves ${((c.route!.totalDurationSeconds - c.routes.first.totalDurationSeconds) / 60).round()} min',
+                            ? 'مسار أسرع يوفر ${c.duration(c.route!.totalDurationSeconds - c.routes.first.totalDurationSeconds)}'
+                            : 'Faster route saves ${c.duration(c.route!.totalDurationSeconds - c.routes.first.totalDurationSeconds)}',
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 12,
@@ -1146,6 +1264,50 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               child: _buildParkingPromptCard(context, c, dark, arabic),
             ),
 
+          // Live Convoy Track Overview Badge (Top Left)
+          if (c.activeLiveRoom != null && c.activeLiveRoom!.isActive)
+            Positioned(
+              top: c.navigating ? 156 : 56,
+              left: 16,
+              child: Material(
+                elevation: 6,
+                borderRadius: BorderRadius.circular(20),
+                color: dark ? const Color(0xFF10281E) : const Color(0xFFE8F8F0),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(20),
+                  onTap: _fitConvoyOverview,
+                  onLongPress: _openLiveRoomSheet,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: const Color(0xFF00E676),
+                        width: 1.5,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.groups_rounded, color: Color(0xFF00E676), size: 18),
+                        const SizedBox(width: 6),
+                        Text(
+                          arabic
+                              ? 'موكب (${c.activeLiveRoom!.code}) • مسار الشلّة 🚗'
+                              : 'Convoy (${c.activeLiveRoom!.code}) • Track 🚗',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w800,
+                            color: dark ? Colors.white : Colors.black87,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
           // Notification / Error banners
           if (c.error != null || c.notice != null)
             Positioned(
@@ -1215,24 +1377,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 ),
                 const SizedBox(height: 10),
 
-                // Recenter / Follow GPS Button
-                _buildCircularButton(
-                  icon: Icons.my_location_rounded,
-                  color: _followUser ? WazeColors.cyan : (dark ? Colors.white60 : Colors.black54),
-                  dark: dark,
-                  onPressed: _recenter,
-                ),
-                const SizedBox(height: 10),
-
-                // Compass / Heading-Up Toggle Button
-                _buildCircularButton(
-                  icon: _headingUp ? Icons.explore_rounded : Icons.north_rounded,
-                  color: _headingUp ? WazeColors.cyan : (dark ? Colors.white60 : Colors.black54),
-                  dark: dark,
-                  onPressed: _toggleHeadingUp,
-                ),
-                const SizedBox(height: 10),
-
                 // 3D Perspective Driving View Button
                 _buildCircularButton(
                   icon: _is3D ? Icons.view_in_ar_rounded : Icons.layers_rounded,
@@ -1280,49 +1424,52 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             ),
           ),
 
-          // Speedometer (Bottom Left)
+          // Speedometer & Orange Report Button (Stacked vertically on Bottom Left)
           Positioned(
             left: 20,
-            bottom: c.navigating ? 160 : 210,
-            child: WazeSpeedometer(
-              speedKph: c.speedKph,
-              miles: c.miles,
-              dark: dark,
-            ),
-          ),
-
-          // Iconic Waze Orange Report Button (Bottom Right)
-          Positioned(
-            right: 20,
-            bottom: c.navigating ? 160 : 206,
-            child: Material(
-              color: Colors.transparent,
-              child: InkWell(
-                onTap: _openReportSheet,
-                borderRadius: BorderRadius.circular(32),
-                child: Container(
-                  width: 64,
-                  height: 64,
-                  decoration: BoxDecoration(
-                    color: WazeColors.orange,
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: WazeColors.orange.withValues(alpha: 0.5),
-                        blurRadius: 14,
-                        offset: const Offset(0, 5),
+            bottom: c.navigating ? 150 : (_bottomPanelMinimized ? 76 : 205),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                // Iconic Waze Orange Report Button (Directly above Speedometer)
+                Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: _openReportSheet,
+                    borderRadius: BorderRadius.circular(32),
+                    child: Container(
+                      width: 58,
+                      height: 58,
+                      decoration: BoxDecoration(
+                        color: WazeColors.orange,
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: WazeColors.orange.withValues(alpha: 0.5),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
-                  child: const Center(
-                    child: Icon(
-                      Icons.campaign_rounded,
-                      color: Colors.white,
-                      size: 32,
+                      child: const Center(
+                        child: Icon(
+                          Icons.campaign_rounded,
+                          color: Colors.white,
+                          size: 30,
+                        ),
+                      ),
                     ),
                   ),
                 ),
-              ),
+                const SizedBox(height: 10),
+                // Speedometer
+                WazeSpeedometer(
+                  speedKph: c.speedKph,
+                  miles: c.miles,
+                  dark: dark,
+                ),
+              ],
             ),
           ),
 
@@ -1331,34 +1478,34 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             Positioned(
               left: 0,
               right: 0,
-              bottom: c.navigating ? 140 : 190,
+              bottom: c.navigating ? 135 : (_bottomPanelMinimized ? 74 : 185),
               child: Center(
                 child: Material(
                   elevation: 8,
-                  borderRadius: BorderRadius.circular(24),
+                  borderRadius: BorderRadius.circular(20),
                   color: dark ? const Color(0xFF1E2835) : Colors.white,
                   child: InkWell(
-                    borderRadius: BorderRadius.circular(24),
+                    borderRadius: BorderRadius.circular(20),
                     onTap: _recenter,
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
                       decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(24),
+                        borderRadius: BorderRadius.circular(20),
                         border: Border.all(color: WazeColors.cyan, width: 1.5),
                         boxShadow: const [
-                          BoxShadow(color: Colors.black26, blurRadius: 10, offset: Offset(0, 4)),
+                          BoxShadow(color: Colors.black26, blurRadius: 8, offset: Offset(0, 3)),
                         ],
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(Icons.my_location_rounded, color: WazeColors.cyan, size: 20),
-                          const SizedBox(width: 8),
+                          const Icon(Icons.my_location_rounded, color: WazeColors.cyan, size: 17),
+                          const SizedBox(width: 6),
                           Text(
-                            arabic ? 'إعادة التوسيط على موقعي' : 'Recenter to my location',
+                            arabic ? 'أعدني لموقعي' : 'Recenter',
                             style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.bold,
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w800,
                               color: dark ? Colors.white : Colors.black87,
                             ),
                           ),
@@ -1381,6 +1528,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               onTapSettings: _openSettings,
               onTapAddStop: () => _openSearch(asStop: true),
               onTapVoice: _openVoiceSearch,
+              onOpenLiveRoom: _openLiveRoomSheet,
+              onFitTrack: _fitConvoyOverview,
+              isMinimized: _bottomPanelMinimized,
+              onMinimizedChanged: (min) {
+                setState(() => _bottomPanelMinimized = min);
+              },
             ),
           ),
         ],

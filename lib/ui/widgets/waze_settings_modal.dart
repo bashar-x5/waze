@@ -4,6 +4,8 @@ import '../../domain/models.dart';
 import '../waze_theme.dart';
 import 'waze_offline_modal.dart';
 import 'waze_permission_sheet.dart';
+import 'waze_developer_sheet.dart';
+import 'waze_android_auto_modal.dart';
 
 class WazeSettingsModal extends StatelessWidget {
   const WazeSettingsModal({super.key, required this.controller});
@@ -223,6 +225,47 @@ class WazeSettingsModal extends StatelessWidget {
 
                 const Divider(),
                 _buildSectionHeader(
+                  arabic ? 'الملاحة في السيارة (Android Auto)' : 'Car Navigation (Android Auto)',
+                  textColor,
+                ),
+                ListTile(
+                  leading: Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      color: Colors.blue.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(Icons.directions_car_filled_rounded, color: WazeColors.blue),
+                  ),
+                  title: Text(
+                    arabic ? 'شاشات السيارات وأندرويد أوتو' : 'Car Display & Android Auto',
+                    style: TextStyle(color: textColor, fontWeight: FontWeight.w700),
+                  ),
+                  subtitle: Text(
+                    arabic
+                        ? 'تفعيل وتشغيل درب على شاشة سيارتك مع التوجيه الصوتي والـ HUD'
+                        : 'Enable & launch Darb on your car dashboard with full HUD navigation',
+                    style: TextStyle(color: dark ? Colors.white60 : Colors.black54, fontSize: 12),
+                  ),
+                  trailing: ElevatedButton.icon(
+                    icon: const Icon(Icons.settings_suggest_rounded, size: 16),
+                    label: Text(arabic ? 'إعداد' : 'Setup'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: WazeColors.blue,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                      showWazeAndroidAutoModal(context, controller: c);
+                    },
+                  ),
+                ),
+
+                const Divider(),
+                _buildSectionHeader(
                   arabic ? 'الخرائط والمجتمع' : 'Maps & Community',
                   textColor,
                 ),
@@ -329,6 +372,89 @@ class WazeSettingsModal extends StatelessWidget {
                         onSelected: (val) => c.setAlert(type, val),
                       );
                     }).toList(),
+                  ),
+                ),
+
+                const SizedBox(height: 20),
+                const Divider(),
+                _buildSectionHeader(
+                  arabic ? 'عن المطور والتطبيق' : 'About Developer & App',
+                  textColor,
+                ),
+                Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: dark ? WazeColors.darkCard : const Color(0xFFF1F5F9),
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(
+                      color: WazeColors.cyan.withValues(alpha: 0.3),
+                    ),
+                  ),
+                  child: Column(
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            width: 48,
+                            height: 48,
+                            decoration: const BoxDecoration(
+                              shape: BoxShape.circle,
+                              gradient: LinearGradient(
+                                colors: [WazeColors.cyan, WazeColors.blue],
+                              ),
+                            ),
+                            child: const Icon(Icons.person_rounded, color: Colors.white, size: 28),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  arabic ? 'بشار محمود لفته' : 'Bashar Mahmoud Lafta',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w800,
+                                    color: textColor,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  arabic ? 'مطور ومؤسس تطبيق دَرب للملاحة' : 'Creator & Lead Developer of Darb',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: WazeColors.cyan,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: () {
+                            Navigator.of(context).pop();
+                            showWazeDeveloperSheet(context, controller: c);
+                          },
+                          icon: const Icon(Icons.badge_rounded, size: 18),
+                          label: Text(
+                            arabic ? 'عرض ملف المطور والتواصل' : 'View Developer Profile & Contact',
+                            style: const TextStyle(fontWeight: FontWeight.w800),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: WazeColors.cyan,
+                            foregroundColor: Colors.black,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
 

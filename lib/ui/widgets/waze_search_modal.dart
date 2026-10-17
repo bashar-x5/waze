@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:latlong2/latlong.dart';
 import '../../app/app_controller.dart';
 import '../../domain/demo_data.dart';
 import '../../domain/models.dart';
@@ -230,15 +231,15 @@ class _WazeSearchModalState extends State<WazeSearchModal> {
                     showCheckmark: false,
                     avatar: Icon(
                       _categoryIcon(cat),
-                      size: 16,
+                      size: 18,
                       color: isSelected
                           ? Colors.white
                           : (dark ? Colors.white70 : Colors.black87),
                     ),
                     label: Text(_categoryQuery(cat)),
                     labelStyle: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
                       color: isSelected
                           ? Colors.white
                           : (dark ? Colors.white70 : Colors.black87),
@@ -315,6 +316,8 @@ class _WazeSearchModalState extends State<WazeSearchModal> {
                       itemBuilder: (context, i) {
                         final p = placesToShow[i];
                         final isSaved = c.isSaved(p);
+                        final meters = const Distance().as(LengthUnit.Meter, c.position, p.point);
+                        final distStr = c.distance(meters.toDouble());
 
                         return ListTile(
                           contentPadding: const EdgeInsets.symmetric(
@@ -334,21 +337,47 @@ class _WazeSearchModalState extends State<WazeSearchModal> {
                               size: 22,
                             ),
                           ),
-                          title: Text(
-                            p.label(arabic),
-                            style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w700,
-                              color: textColor,
-                            ),
+                          title: Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  p.label(arabic),
+                                  style: TextStyle(
+                                    fontSize: 15.5,
+                                    fontWeight: FontWeight.w800,
+                                    color: textColor,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: WazeColors.cyan.withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  distStr,
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w800,
+                                    color: WazeColors.blue,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
-                          subtitle: Text(
-                            p.detail(arabic),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: dark ? Colors.white60 : Colors.black54,
+                          subtitle: Padding(
+                            padding: const EdgeInsets.only(top: 2),
+                            child: Text(
+                              p.detail(arabic),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: dark ? Colors.white70 : Colors.black54,
+                              ),
                             ),
                           ),
                           trailing: Row(
@@ -380,7 +409,7 @@ class _WazeSearchModalState extends State<WazeSearchModal> {
                                       : (arabic ? 'انطلق' : 'Drive'),
                                   style: const TextStyle(
                                     fontSize: 13,
-                                    fontWeight: FontWeight.bold,
+                                    fontWeight: FontWeight.w900,
                                   ),
                                 ),
                               ),

@@ -82,16 +82,14 @@ void main() {
 
       expect(find.text('Send Alert Now'), findsOneWidget);
 
-      // Enter comment
-      await tester.enterText(find.byType(TextField), 'Speed trap ahead');
-      await tester.pump();
-
-      // Tap Send
+      // Tap Send without needing to write any comments
+      await tester.ensureVisible(find.text('Send Alert Now'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Send Alert Now'));
       await tester.pump();
 
       expect(submittedType, ReportType.police);
-      expect(submittedComment, 'Speed trap ahead');
+      expect(submittedComment, 'Police');
     });
 
     testWidgets('WazeIncidentPopup displays alert and triggers confirmation', (tester) async {

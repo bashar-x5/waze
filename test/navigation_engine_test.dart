@@ -34,6 +34,21 @@ void main() {
       );
       expect(progress.traveledMeters, closeTo(1500, 2));
       expect(progress.stepIndex, 1);
+      expect(progress.stepRemainingMeters, closeTo(500, 2));
+    });
+
+    test('stepRemainingMeters decreases dynamically as vehicle approaches maneuver', () {
+      final p1 = calculateProgress(_route(), const LatLng(0, 0.002));
+      final p2 = calculateProgress(_route(), const LatLng(0, 0.007), previousMeters: 200);
+
+      expect(p1.stepIndex, 0);
+      expect(p1.traveledMeters, closeTo(200, 5));
+      expect(p1.stepRemainingMeters, closeTo(800, 5));
+
+      expect(p2.stepIndex, 0);
+      expect(p2.traveledMeters, closeTo(702, 5));
+      expect(p2.stepRemainingMeters, closeTo(298, 5));
+      expect(p2.stepRemainingMeters!, lessThan(p1.stepRemainingMeters!));
     });
 
     test('a backward GPS drift never rewinds progress or the current step', () {

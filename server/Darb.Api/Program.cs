@@ -33,6 +33,9 @@ builder.Services.AddHttpClient<ITomTomTrafficHarvester, TomTomTrafficHarvester>(
 builder.Services.AddScoped<ITomTomTrafficHarvester, TomTomTrafficHarvester>();
 builder.Services.AddHostedService<TrafficAggregationWorker>();
 
+// 3.1 Live Convoy & Family Room Tracking Service
+builder.Services.AddSingleton<ILiveRoomService, LiveRoomService>();
+
 // 4. CORS Policy for mobile and web clients
 builder.Services.AddCors(options =>
 {
@@ -138,13 +141,13 @@ app.MapGet("/api/auth/verify", (HttpContext ctx) =>
 // App version & update info endpoint (100% Public)
 app.MapGet("/api/app/version", () => Results.Ok(new
 {
-    versionCode = 6,
-    versionName = "1.0.6",
+    versionCode = 7,
+    versionName = "1.0.7",
     apkUrl = "http://139.185.47.123:5000/darb.apk",
-    apkSizeBytes = 86608488,
+    apkSizeBytes = 87000000,
     publishedAt = DateTime.UtcNow,
-    releaseNotesAr = "تثبيت مؤشر الموقع على الخريطة أثناء التحريك، وإزالة خطوط الطرق الزائدة لتجربة تصفح نظيفة وسلسة",
-    releaseNotesEn = "Fixed cursor location sticking to map during finger pan, cleaned up road lines for smooth navigation"
+    releaseNotesAr = "تكبير وتغميق الخطوط، جعل أزرار الإجراءات قابلة للتمرير والتجاوب، تصغير اللوحة السفلية لرؤية الخريطة بحجم كامل، ترتيب الأماكن الأقرب أولاً، ونقل زر البلاغات فوق عداد السرعة",
+    releaseNotesEn = "Bolder typography, responsive scrollable pills, minimizable bottom sheet for full map view, nearest-first places sorting, and report button above speedometer"
 }))
 .WithName("GetAppVersion");
 
@@ -649,5 +652,77 @@ app.MapGet("/api/dashboard/stats", async (
     });
 })
 .WithName("GetDashboardStats");
+
+// -------------------------------------------------------------
+// LIVE CONVOY & FAMILY ROOM API
+// -------------------------------------------------------------
+app.MapPost("/api/rooms", ([FromBody] CreateLiveRoomRequest req, HttpContext ctx, ILiveRoomService roomService) =>
+{
+    var scheme = ctx.Request.Scheme;
+    var host = ctx.Request.Host.Value;
+    var baseUrl = $"{scheme}://{host}";
+    var room = roomService.CreateRoom(req, baseUrl);
+    return Results.Ok(room);
+})
+.WithName("CreateLiveRoom");
+
+app.MapGet("/api/rooms/{code}", (string code, ILiveRoomService roomService) =>
+{
+    var room = roomService.GetRoom(code);
+    if (room == null) return Results.NotFound(new { message = "الغرفة غير موجودة أو انتهت صلاحيتها." });
+    return Results.Ok(room);
+})
+.WithName("GetLiveRoom");
+
+app.MapPost("/api/rooms/{code}/ping", (string code, [FromBody] PingLiveRoomRequest req, ILiveRoomService roomService) =>
+{
+    var room = roomService.PingMember(code, req);
+    if (room == null) return Results.NotFound(new { message = "الغرفة غير موجودة أو تم إغلاقها." });
+    return Results.Ok(room);
+})
+.WithName("PingLiveRoom");
+
+app.MapPost("/api/rooms/{code}/leave", (string code, [FromQuery] string memberId, ILiveRoomService roomService) =>
+{
+    var success = roomService.LeaveRoom(code, memberId);
+    return Results.Ok(new { success });
+})
+.WithName("LeaveLiveRoom");
+
+app.MapPost("/api/rooms/{code}/end", (string code, [FromBody] EndLiveRoomRequest req, ILiveRoomService roomService) =>
+{
+    var success = roomService.EndRoom(code, req?.RequesterId ?? "");
+    return Results.Ok(new { success });
+})
+.WithName("EndLiveRoom");
+
+app.MapPost("/api/rooms/{code}/destination", (string code, [FromBody] SetDestinationRequest req, ILiveRoomService roomService) =>
+{
+    var room = roomService.SetDestination(code, req);
+    if (room == null) return Results.NotFound(new { message = "الغرفة غير موجودة أو تم إغلاقها." });
+    return Results.Ok(room);
+})
+.WithName("SetLiveRoomDestination");
+
+app.MapGet("/api/rooms", (ILiveRoomService roomService) =>
+{
+    return Results.Ok(roomService.GetAllActiveRooms());
+})
+.WithName("GetActiveRooms");
+
+// Web tracker handler: /track/{code} -> serves track.html
+app.MapGet("/track/{code}", async (string code, HttpContext ctx) =>
+{
+    ctx.Response.ContentType = "text/html; charset=utf-8";
+    var filePath = Path.Combine(app.Environment.WebRootPath, "track.html");
+    if (File.Exists(filePath))
+    {
+        await ctx.Response.SendFileAsync(filePath);
+    }
+    else
+    {
+        ctx.Response.Redirect($"/track.html?code={Uri.EscapeDataString(code)}");
+    }
+});
 
 app.Run();

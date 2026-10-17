@@ -47,8 +47,9 @@ class WazeNavHud extends StatelessWidget {
     final maneuverIcon = WazeColors.maneuverIcon(currentStep.type);
     final instruction = currentStep.label(arabic);
 
-    // Distance to this maneuver or remaining to next step
-    final distanceText = _formatDistance(currentStep.distanceMeters);
+    // Decreasing distance to maneuver as vehicle approaches
+    final distanceMeters = progress.stepRemainingMeters ?? currentStep.distanceMeters;
+    final distanceText = _formatDistance(distanceMeters);
 
     return SafeArea(
       child: Padding(
@@ -111,7 +112,7 @@ class WazeNavHud extends StatelessWidget {
                         Text(
                           distanceText,
                           style: const TextStyle(
-                            fontSize: 22,
+                            fontSize: 25,
                             fontWeight: FontWeight.w900,
                             color: Colors.white,
                             letterSpacing: -0.3,
@@ -123,10 +124,10 @@ class WazeNavHud extends StatelessWidget {
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
                             color: Colors.white,
-                            height: 1.2,
+                            height: 1.25,
                           ),
                         ),
                         if (nextStep != null) ...[
@@ -135,10 +136,10 @@ class WazeNavHud extends StatelessWidget {
                             children: [
                               Icon(
                                 WazeColors.maneuverIcon(nextStep.type),
-                                size: 14,
-                                color: Colors.white70,
+                                size: 16,
+                                color: Colors.white.withValues(alpha: 0.85),
                               ),
-                              const SizedBox(width: 4),
+                              const SizedBox(width: 5),
                               Expanded(
                                 child: Text(
                                   arabic
@@ -147,8 +148,9 @@ class WazeNavHud extends StatelessWidget {
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: const TextStyle(
-                                    fontSize: 11,
-                                    color: Colors.white70,
+                                    fontSize: 12.5,
+                                    fontWeight: FontWeight.w700,
+                                    color: Colors.white,
                                   ),
                                 ),
                               ),
