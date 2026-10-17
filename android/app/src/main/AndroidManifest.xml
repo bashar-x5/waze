@@ -67,9 +67,11 @@
             android:foregroundServiceType="location">
             <intent-filter>
                 <action android:name="androidx.car.app.CarAppService" />
+                <category android:name="androidx.car.app.category.NAVIGATION"/>
+            </intent-filter>
+            <intent-filter>
                 <action android:name="com.google.android.car.action.CAR_APP" />
                 <category android:name="androidx.car.app.category.NAVIGATION"/>
-                <category android:name="androidx.car.app.category.POI"/>
             </intent-filter>
             <intent-filter>
                 <action android:name="androidx.car.app.action.NAVIGATE" />
