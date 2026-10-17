@@ -153,6 +153,126 @@ class WazeBottomPanel extends StatelessWidget {
     final dark = c.dark;
     final arabic = c.arabic;
     final textColor = dark ? Colors.white : Colors.black87;
+    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
+
+    if (isLandscape) {
+      return Padding(
+        key: const ValueKey('idle_panel_landscape'),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (c.parkedLocation != null) ...[
+              _buildParkedCarCard(context, c, dark, textColor, arabic),
+              const SizedBox(height: 6),
+            ],
+            Row(
+              children: [
+                Expanded(
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: onTapSearch,
+                      borderRadius: BorderRadius.circular(16),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: dark ? WazeColors.darkCard : const Color(0xFFF0F3F6),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: dark ? Colors.white12 : Colors.black12,
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.search_rounded, color: WazeColors.cyan, size: 20),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                arabic ? 'إلى أين تريد الذهاب؟' : 'Where to?',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w800,
+                                  color: dark ? Colors.white70 : Colors.black87,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                if (onTapVoice != null) ...[
+                  const SizedBox(width: 6),
+                  IconButton(
+                    icon: const Icon(Icons.mic_rounded, color: WazeColors.cyan, size: 22),
+                    tooltip: arabic ? 'الملاحة الصوتية' : 'Voice Search',
+                    onPressed: onTapVoice,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                  ),
+                ],
+                const SizedBox(width: 6),
+                _buildQuickPill(
+                  icon: Icons.home_rounded,
+                  label: arabic ? 'المنزل' : 'Home',
+                  color: const Color(0xFF29B6F6),
+                  dark: dark,
+                  textColor: textColor,
+                  onTap: () {
+                    if (c.home != null) {
+                      c.chooseDestination(c.home!);
+                    } else {
+                      showModalBottomSheet<void>(
+                        context: context,
+                        backgroundColor: Colors.transparent,
+                        isScrollControlled: true,
+                        builder: (_) => WazeSavedLocationsModal(
+                          controller: c,
+                          initialRole: SavedPlaceRole.home,
+                        ),
+                      );
+                    }
+                  },
+                ),
+                const SizedBox(width: 6),
+                _buildQuickPill(
+                  icon: Icons.work_rounded,
+                  label: arabic ? 'العمل' : 'Work',
+                  color: const Color(0xFFAB47BC),
+                  dark: dark,
+                  textColor: textColor,
+                  onTap: () {
+                    if (c.work != null) {
+                      c.chooseDestination(c.work!);
+                    } else {
+                      showModalBottomSheet<void>(
+                        context: context,
+                        backgroundColor: Colors.transparent,
+                        isScrollControlled: true,
+                        builder: (_) => WazeSavedLocationsModal(
+                          controller: c,
+                          initialRole: SavedPlaceRole.work,
+                        ),
+                      );
+                    }
+                  },
+                ),
+                const SizedBox(width: 6),
+                IconButton(
+                  icon: const Icon(Icons.tune_rounded, size: 20),
+                  color: dark ? Colors.white54 : Colors.black45,
+                  onPressed: onTapSettings,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                ),
+              ],
+            ),
+          ],
+        ),
+      );
+    }
 
     return Padding(
       key: const ValueKey('idle_panel'),
@@ -747,6 +867,112 @@ class WazeBottomPanel extends StatelessWidget {
     final arabic = c.arabic;
     final textColor = dark ? Colors.white : Colors.black87;
     final target = c.destination!;
+    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
+
+    if (isLandscape) {
+      return Padding(
+        key: const ValueKey('preview_panel_landscape'),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.location_on_rounded, color: WazeColors.cyan, size: 18),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          target.label(arabic),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w800,
+                            color: textColor,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close_rounded, size: 18),
+                        onPressed: () => c.clearRoute(),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                      ),
+                    ],
+                  ),
+                  if (c.route != null) ...[
+                    Row(
+                      children: [
+                        Text(
+                          c.duration(c.route!.totalDurationSeconds),
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w900,
+                            color: WazeColors.green,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          c.distance(c.route!.distanceMeters),
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: dark ? Colors.white60 : Colors.black54,
+                          ),
+                        ),
+                        if (c.routes.length > 1) ...[
+                          const SizedBox(width: 8),
+                          InkWell(
+                            onTap: () {
+                              final next = (c.routeIndex + 1) % c.routes.length;
+                              c.selectRoute(next);
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: WazeColors.cyan.withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                '${arabic ? 'مسار' : 'Route'} ${c.routeIndex + 1}/${c.routes.length}',
+                                style: const TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  color: WazeColors.cyan,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(width: 12),
+            FilledButton.icon(
+              onPressed: c.routes.isEmpty ? null : () => c.startNavigation(),
+              icon: const Icon(Icons.navigation_rounded, size: 18),
+              label: Text(
+                arabic ? 'انطلق' : 'Drive',
+                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w900),
+              ),
+              style: FilledButton.styleFrom(
+                backgroundColor: WazeColors.cyan,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
 
     return Padding(
       key: const ValueKey('preview_panel'),

@@ -103,157 +103,163 @@ class _WazePermissionSheetState extends State<WazePermissionSheet> {
         24,
         MediaQuery.of(context).viewInsets.bottom + MediaQuery.of(context).padding.bottom + 20,
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // Drag handle
-          Center(
-            child: Container(
-              width: 42,
-              height: 4,
-              decoration: BoxDecoration(
-                color: dark ? Colors.white24 : Colors.black12,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-          ),
-          const SizedBox(height: 20),
-
-          // Top Header Icon & Title
-          Row(
+      child: SafeArea(
+        top: false,
+        child: SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Container(
-                width: 50,
-                height: 50,
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF00D2FF), Color(0xFF007AFF)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
+              // Drag handle
+              Center(
+                child: Container(
+                  width: 42,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: dark ? Colors.white24 : Colors.black12,
+                    borderRadius: BorderRadius.circular(2),
                   ),
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFF00D2FF).withValues(alpha: 0.35),
-                      blurRadius: 16,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: const Icon(
-                  Icons.shield_outlined,
-                  color: Colors.white,
-                  size: 28,
                 ),
               ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      arabic ? 'أذونات الموقع واستخدام البيانات' : 'Location & Data Permissions',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w900,
-                        color: textColor,
+              const SizedBox(height: 20),
+
+              // Top Header Icon & Title
+              Row(
+                children: [
+                  Container(
+                    width: 50,
+                    height: 50,
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF00D2FF), Color(0xFF007AFF)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
                       ),
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF00D2FF).withValues(alpha: 0.35),
+                          blurRadius: 16,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      arabic
-                          ? 'لتشغيل الملاحة الحية وتحديثات السير في العراق'
-                          : 'Required for live GPS routing and traffic updates in Iraq',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: subColor,
+                    child: const Icon(
+                      Icons.shield_outlined,
+                      color: Colors.white,
+                      size: 28,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          arabic ? 'أذونات الموقع واستخدام البيانات' : 'Location & Data Permissions',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w900,
+                            color: textColor,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          arabic
+                              ? 'لتشغيل الملاحة الحية وتحديثات السير في العراق'
+                              : 'Required for live GPS routing and traffic updates in Iraq',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: subColor,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 22),
+
+              // Permission Card 1: Location
+              _buildPermissionCard(
+                icon: Icons.my_location_rounded,
+                iconColor: const Color(0xFF00D2FF),
+                iconBg: const Color(0xFF00D2FF).withValues(alpha: 0.12),
+                title: arabic ? 'إذن الموقع الدقيق (GPS Location)' : 'Precise Location Access',
+                description: arabic
+                    ? 'مطلوب لتحديد موقع سيارتك على الخريطة، والتوجيه الصوتي خطوة بخطوة، وتنبيهك بالمطبات والازدحامات القريبة.'
+                    : 'Needed to pinpoint vehicle position, provide voice turn guidance, and warn about upcoming speed bumps.',
+                dark: dark,
+                textColor: textColor,
+                subColor: subColor,
+              ),
+
+              const SizedBox(height: 12),
+
+              // Permission Card 2: Data Usage
+              _buildPermissionCard(
+                icon: Icons.wifi_tethering_rounded,
+                iconColor: const Color(0xFF00E676),
+                iconBg: const Color(0xFF00E676).withValues(alpha: 0.12),
+                title: arabic ? 'استخدام بيانات الإنترنت (Data Usage)' : 'Network & Data Usage',
+                description: arabic
+                    ? 'يستخدم التطبيق الإنترنت لتحميل خرائط الأقمار الصناعية وبيانات حركة السير الحية بأقل استهلاك ممكن وبدون أي إعلانات.'
+                    : 'Used to fetch satellite vector tiles and live Baghdad traffic conditions with minimal data bandwidth.',
+                dark: dark,
+                textColor: textColor,
+                subColor: subColor,
+              ),
+
+              const SizedBox(height: 24),
+
+              // Action Buttons
+              ElevatedButton(
+                onPressed: _requesting ? null : _grantPermissions,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF00D2FF),
+                  foregroundColor: const Color(0xFF070B10),
+                  elevation: 4,
+                  shadowColor: const Color(0xFF00D2FF).withValues(alpha: 0.4),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                ),
+                child: _requesting
+                    ? const SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.black),
+                      )
+                    : Text(
+                        arabic ? 'الموافقة ومنح الأذونات' : 'Allow & Continue',
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w900,
+                        ),
                       ),
-                    ),
-                  ],
+              ),
+
+              const SizedBox(height: 10),
+
+              TextButton(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                },
+                style: TextButton.styleFrom(
+                  foregroundColor: subColor,
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                ),
+                child: Text(
+                  arabic ? 'المتابعة بالوضع التجريبي (بدون GPS)' : 'Continue in Demo Mode',
+                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
                 ),
               ),
             ],
           ),
-
-          const SizedBox(height: 22),
-
-          // Permission Card 1: Location
-          _buildPermissionCard(
-            icon: Icons.my_location_rounded,
-            iconColor: const Color(0xFF00D2FF),
-            iconBg: const Color(0xFF00D2FF).withValues(alpha: 0.12),
-            title: arabic ? 'إذن الموقع الدقيق (GPS Location)' : 'Precise Location Access',
-            description: arabic
-                ? 'مطلوب لتحديد موقع سيارتك على الخريطة، والتوجيه الصوتي خطوة بخطوة، وتنبيهك بالمطبات والازدحامات القريبة.'
-                : 'Needed to pinpoint vehicle position, provide voice turn guidance, and warn about upcoming speed bumps.',
-            dark: dark,
-            textColor: textColor,
-            subColor: subColor,
-          ),
-
-          const SizedBox(height: 12),
-
-          // Permission Card 2: Data Usage
-          _buildPermissionCard(
-            icon: Icons.wifi_tethering_rounded,
-            iconColor: const Color(0xFF00E676),
-            iconBg: const Color(0xFF00E676).withValues(alpha: 0.12),
-            title: arabic ? 'استخدام بيانات الإنترنت (Data Usage)' : 'Network & Data Usage',
-            description: arabic
-                ? 'يستخدم التطبيق الإنترنت لتحميل خرائط الأقمار الصناعية وبيانات حركة السير الحية بأقل استهلاك ممكن وبدون أي إعلانات.'
-                : 'Used to fetch satellite vector tiles and live Baghdad traffic conditions with minimal data bandwidth.',
-            dark: dark,
-            textColor: textColor,
-            subColor: subColor,
-          ),
-
-          const SizedBox(height: 24),
-
-          // Action Buttons
-          ElevatedButton(
-            onPressed: _requesting ? null : _grantPermissions,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF00D2FF),
-              foregroundColor: const Color(0xFF070B10),
-              elevation: 4,
-              shadowColor: const Color(0xFF00D2FF).withValues(alpha: 0.4),
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-            ),
-            child: _requesting
-                ? const SizedBox(
-                    width: 22,
-                    height: 22,
-                    child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.black),
-                  )
-                : Text(
-                    arabic ? 'الموافقة ومنح الأذونات' : 'Allow & Continue',
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-          ),
-
-          const SizedBox(height: 10),
-
-          TextButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-            },
-            style: TextButton.styleFrom(
-              foregroundColor: subColor,
-              padding: const EdgeInsets.symmetric(vertical: 10),
-            ),
-            child: Text(
-              arabic ? 'المتابعة بالوضع التجريبي (بدون GPS)' : 'Continue in Demo Mode',
-              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
